@@ -1,0 +1,747 @@
+from __future__ import annotations
+
+import re
+import tempfile
+import zipfile
+from dataclasses import dataclass, field
+from datetime import date
+from html import unescape
+from pathlib import Path
+from typing import Any
+from xml.etree import ElementTree
+
+
+COMMON_SKILLS = {
+    "AWS",
+    "Azure",
+    "C",
+    "C++",
+    "C#",
+    "CI/CD",
+    "Cloud Basics",
+    "CSS",
+    "Data Cleaning",
+    "Data Visualization",
+    "Deep Learning",
+    "Docker",
+    "Excel",
+    "FastAPI",
+    "Figma",
+    "Firebase",
+    "Flutter",
+    "Git",
+    "Google Ads",
+    "HTML",
+    "Java",
+    "JavaScript",
+    "Kubernetes",
+    "Linux",
+    "Machine Learning",
+    "MLOps",
+    "Networking",
+    "NumPy",
+    "Pandas",
+    "Power BI",
+    "Prompt Engineering",
+    "Python",
+    "React",
+    "REST APIs",
+    "ROS",
+    "Security",
+    "SQL",
+    "Statistics",
+    "System Design",
+    "Tableau",
+    "Terraform",
+    "TypeScript",
+    "Unity",
+    "Django",
+    "Flask",
+    "TensorFlow",
+    "PyTorch",
+    "MongoDB",
+    "PostgreSQL",
+    "MySQL",
+    "Leadership",
+    "Communication",
+    "Problem Solving",
+    "Business Analytics",
+    "SEO",
+    "Content Strategy",
+    "Email Marketing",
+    "A/B Testing",
+    "Financial Modeling",
+    "Accounting",
+    "Valuation",
+    "Canva",
+    "Photoshop",
+    "English",
+    "Hindi",
+    "German",
+}
+
+SKILL_CATEGORIES = {
+    "Programming Languages": {"C", "C++", "C#", "Dart", "Java", "JavaScript", "Python", "R", "SQL", "TypeScript"},
+    "Frameworks": {"Django", "FastAPI", "Firebase", "Flask", "Flutter", "React", "ROS", "Streamlit", "TensorFlow", "PyTorch", "Unity"},
+    "Databases": {"MongoDB", "MySQL", "PostgreSQL", "SQL"},
+    "Cloud": {"AWS", "Azure", "Cloud Basics", "Docker", "Kubernetes", "Terraform"},
+    "AI/ML": {"AI Projects", "Data Analysis", "Deep Learning", "Machine Learning", "MLOps", "NumPy", "Pandas", "Statistics"},
+    "DevOps": {"CI/CD", "Docker", "Kubernetes", "Linux", "Terraform"},
+    "Business": {"Business Analytics", "Business Communication", "Stakeholder Management"},
+    "Marketing": {"A/B Testing", "Content Strategy", "Email Marketing", "Google Ads", "SEO"},
+    "Finance": {"Accounting", "Excel", "Financial Modeling", "Valuation"},
+    "Design": {"Canva", "Figma", "Photoshop", "User Research"},
+    "Soft Skills": {"Business Communication", "Communication", "Leadership", "Problem Solving", "Stakeholder Management", "User Research"},
+    "Languages": {"English", "German", "Hindi"},
+    "Visualization": {"Data Visualization", "Power BI", "Tableau"},
+    "Tools": {"Excel", "Figma", "Git", "Google Ads", "Power BI", "Tableau"},
+}
+
+
+SECTION_ALIASES = {
+    "skills": ["skills", "technical skills", "technologies", "tools"],
+    "projects": ["projects", "academic projects", "personal projects"],
+    "education": ["education", "academics", "qualifications"],
+    "certifications": ["certifications", "certificates", "licenses", "courses"],
+    "experience": ["experience", "work experience", "internships", "employment"],
+}
+
+CONFIDENCE_LOW_MESSAGE = "We couldn't confidently detect this field."
+
+
+@dataclass
+class ResumeParseResult:
+    text: str
+    skills: list[str] = field(default_factory=list)
+    projects: list[str] = field(default_factory=list)
+    education: list[str] = field(default_factory=list)
+    certifications: list[str] = field(default_factory=list)
+    experience: list[str] = field(default_factory=list)
+    name: str = ""
+    email: str = ""
+    phone: str = ""
+    linkedin: str = ""
+    github: str = ""
+    portfolio: str = ""
+    location: str = ""
+    age: int | None = None
+    degree: str = ""
+    branch: str = ""
+    university: str = ""
+    start_year: int | None = None
+    graduation_year: int | None = None
+    current_year: str = "Not Specified"
+    gpa: float | None = None
+    extraction_status: str = "Failed"
+    strength_score: int = 0
+    completeness_score: int = 0
+    industry_readiness_score: int = 0
+    ats_readiness_score: int = 0
+    overall_career_readiness_score: int = 0
+    skill_categories: dict[str, list[str]] = field(default_factory=dict)
+    structured_projects: list[dict[str, str]] = field(default_factory=list)
+    structured_experience: list[dict[str, str]] = field(default_factory=list)
+    structured_certifications: list[dict[str, str]] = field(default_factory=list)
+    field_confidence: dict[str, float] = field(default_factory=dict)
+    insights: list[str] = field(default_factory=list)
+
+    def autofill(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "age": self.age,
+            "degree": self.degree,
+            "branch": self.branch,
+            "current_year": self.current_year if self.current_year != "Not Specified" else "",
+            "gpa": self.gpa,
+            "skills": ", ".join(self.skills),
+            "projects": "\n".join(format_project(project) for project in self.structured_projects) or "\n".join(self.projects),
+            "certifications": "\n".join(format_certification(cert) for cert in self.structured_certifications) or "\n".join(self.certifications),
+            "internships": "\n".join(format_experience(exp) for exp in self.structured_experience) or "\n".join(self.experience),
+        }
+
+
+def extract_resume_text(uploaded_file: Any) -> str:
+    suffix = Path(uploaded_file.name).suffix.casefold() or ".pdf"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        temp_file.write(uploaded_file.getbuffer())
+        temp_path = temp_file.name
+
+    try:
+        if suffix == ".pdf":
+            return extract_pdf_text(temp_path)
+        if suffix == ".docx":
+            return extract_docx_text(temp_path)
+        if suffix in {".jpg", ".jpeg", ".png"}:
+            return extract_image_text(temp_path)
+        raise RuntimeError("Unsupported resume format. Upload PDF, DOCX, JPG, JPEG, or PNG.")
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def extract_pdf_text(path: str) -> str:
+    try:
+        import fitz
+    except ImportError as exc:
+        raise RuntimeError("PyMuPDF is not installed. Install requirements.txt and try again.") from exc
+
+    with fitz.open(path) as document:
+        pages = [page.get_text("text") for page in document]
+    return "\n".join(pages).strip()
+
+
+def extract_docx_text(path: str) -> str:
+    try:
+        with zipfile.ZipFile(path) as document:
+            xml = document.read("word/document.xml")
+    except KeyError as exc:
+        raise RuntimeError("Could not read DOCX text from this resume.") from exc
+
+    root = ElementTree.fromstring(xml)
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs = []
+    for paragraph in root.findall(".//w:p", namespace):
+        text = "".join(node.text or "" for node in paragraph.findall(".//w:t", namespace))
+        if text.strip():
+            paragraphs.append(text.strip())
+    return "\n".join(paragraphs)
+
+
+def extract_image_text(path: str) -> str:
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError as exc:
+        raise RuntimeError("Image resume OCR requires pytesseract and Pillow. Install OCR dependencies and try again.") from exc
+
+    try:
+        return pytesseract.image_to_string(Image.open(path)).strip()
+    except Exception as exc:
+        raise RuntimeError("OCR could not extract text from this image resume.") from exc
+
+
+def parse_resume_text(text: str, careers: dict[str, dict[str, Any]]) -> ResumeParseResult:
+    normalized_text = normalize_text(text)
+    if not normalized_text:
+        return ResumeParseResult(
+            text="",
+            extraction_status="Failed",
+            insights=["No text could be extracted from this resume."],
+        )
+
+    sections = extract_sections(normalized_text)
+    skill_bank = build_skill_bank(careers)
+
+    result = ResumeParseResult(
+        text=normalized_text,
+        skills=detect_skills(normalized_text, skill_bank),
+        projects=detect_section_items(sections.get("projects", "")),
+        education=detect_section_items(sections.get("education", "")),
+        certifications=detect_section_items(sections.get("certifications", "")),
+        experience=detect_section_items(sections.get("experience", "")),
+        name=detect_name(normalized_text),
+        email=detect_email(normalized_text),
+        phone=detect_phone(normalized_text),
+        linkedin=detect_linkedin(normalized_text),
+        github=detect_github(normalized_text),
+        portfolio=detect_portfolio(normalized_text),
+        location=detect_location(normalized_text),
+        age=detect_age(normalized_text),
+        gpa=detect_gpa(normalized_text),
+    )
+    result.skill_categories = categorize_skills(result.skills)
+    result.structured_projects = parse_projects(sections.get("projects", ""))
+    result.structured_experience = parse_experience(sections.get("experience", ""))
+    result.structured_certifications = parse_certifications(sections.get("certifications", ""))
+    result.degree = detect_degree(result.education, normalized_text)
+    result.branch = detect_branch(result.education, normalized_text)
+    result.university = detect_university(result.education, normalized_text)
+    result.start_year, result.graduation_year = detect_education_years(result.education, normalized_text)
+    result.current_year = infer_current_year(result.start_year, result.graduation_year)
+    result.field_confidence = calculate_field_confidence(result)
+    result.extraction_status = determine_extraction_status(result)
+    scores = calculate_resume_scores(result)
+    result.strength_score = scores["resume_strength"]
+    result.completeness_score = scores["resume_completeness"]
+    result.industry_readiness_score = scores["industry_readiness"]
+    result.ats_readiness_score = scores["ats_readiness"]
+    result.overall_career_readiness_score = scores["overall_career_readiness"]
+    result.insights = build_resume_insights(result)
+    return result
+
+
+def parse_uploaded_resume(uploaded_file: Any, careers: dict[str, dict[str, Any]]) -> ResumeParseResult:
+    result = parse_resume_text(extract_resume_text(uploaded_file), careers)
+    if result.extraction_status == "Failed" and not result.text:
+        raise RuntimeError("No text could be extracted from this resume.")
+    return result
+
+
+def normalize_text(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
+
+
+def build_skill_bank(careers: dict[str, dict[str, Any]]) -> list[str]:
+    skills = set(COMMON_SKILLS)
+    for career in careers.values():
+        skills.update(career.get("required_skills", []))
+    return sorted(skills, key=lambda value: (-len(value), value.casefold()))
+
+
+def detect_skills(text: str, skill_bank: list[str]) -> list[str]:
+    found = []
+    for skill in skill_bank:
+        pattern = r"(?<![a-zA-Z0-9+#.])" + re.escape(skill) + r"(?![a-zA-Z0-9+#.])"
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            found.append(skill)
+    return sorted(set(found), key=str.casefold)
+
+
+def categorize_skills(skills: list[str]) -> dict[str, list[str]]:
+    categorized = {category: [] for category in SKILL_CATEGORIES}
+    uncategorized = []
+    for skill in skills:
+        placed = False
+        for category, category_skills in SKILL_CATEGORIES.items():
+            if skill in category_skills:
+                categorized[category].append(skill)
+                placed = True
+        if not placed:
+            uncategorized.append(skill)
+    if uncategorized:
+        categorized["Tools"].extend(uncategorized)
+    return {category: sorted(set(values), key=str.casefold) for category, values in categorized.items()}
+
+
+def extract_sections(text: str) -> dict[str, str]:
+    lines = text.splitlines()
+    heading_to_section = {
+        alias: section
+        for section, aliases in SECTION_ALIASES.items()
+        for alias in aliases
+    }
+    sections: dict[str, list[str]] = {}
+    current_section = ""
+
+    for line in lines:
+        key = re.sub(r"[^a-z ]", "", line.casefold()).strip()
+        matched_section = heading_to_section.get(key)
+        if matched_section:
+            current_section = matched_section
+            sections.setdefault(current_section, [])
+            continue
+        if current_section:
+            sections[current_section].append(line)
+
+    return {section: "\n".join(content).strip() for section, content in sections.items()}
+
+
+def detect_section_items(section_text: str, limit: int = 8) -> list[str]:
+    if not section_text:
+        return []
+
+    items = []
+    for line in section_text.splitlines():
+        cleaned = re.sub(r"^[\-*•\d.)\s]+", "", line).strip()
+        if 4 <= len(cleaned) <= 140 and not is_section_heading(cleaned):
+            items.append(cleaned)
+    return dedupe_preserve_order(items)[:limit]
+
+
+def parse_projects(section_text: str) -> list[dict[str, str]]:
+    projects = []
+    for item in detect_section_items(section_text, limit=10):
+        parts = [part.strip() for part in re.split(r"\s+[|–—-]\s+", item, maxsplit=2) if part.strip()]
+        name = parts[0] if parts else item
+        description = parts[-1] if len(parts) > 1 else item
+        tech_stack = ", ".join(detect_skills(item, sorted(COMMON_SKILLS, key=lambda value: (-len(value), value.casefold()))))
+        impact = detect_impact(item)
+        projects.append(
+            {
+                "name": name,
+                "tech_stack": tech_stack,
+                "description": description,
+                "impact": impact,
+                "role": detect_project_role(item),
+            }
+        )
+    return projects
+
+
+def parse_experience(section_text: str) -> list[dict[str, str]]:
+    experiences = []
+    for item in detect_section_items(section_text, limit=10):
+        duration = detect_duration(item)
+        role = detect_role(item)
+        company = detect_company(item)
+        experiences.append(
+            {
+                "company": company,
+                "role": role,
+                "duration": duration,
+                "responsibilities": item,
+                "skills_used": ", ".join(detect_skills(item, sorted(COMMON_SKILLS, key=lambda value: (-len(value), value.casefold())))),
+                "achievements": detect_impact(item),
+            }
+        )
+    return experiences
+
+
+def parse_certifications(section_text: str) -> list[dict[str, str]]:
+    certifications = []
+    for item in detect_section_items(section_text, limit=10):
+        year_match = re.search(r"\b(20\d{2}|19\d{2})\b", item)
+        provider = ""
+        provider_match = re.search(r"\b(?:by|from|provider:)\s+([A-Za-z0-9 .&+-]+)", item, flags=re.IGNORECASE)
+        if provider_match:
+            provider = provider_match.group(1).strip()
+        certifications.append(
+            {
+                "name": re.sub(r"\b(20\d{2}|19\d{2})\b", "", item).strip(" -|"),
+                "provider": provider,
+                "completion_year": year_match.group(1) if year_match else "",
+            }
+        )
+    return certifications
+
+
+def is_section_heading(value: str) -> bool:
+    key = re.sub(r"[^a-z ]", "", value.casefold()).strip()
+    return any(key in aliases for aliases in SECTION_ALIASES.values())
+
+
+def detect_name(text: str) -> str:
+    for line in text.splitlines()[:8]:
+        if "@" in line or re.search(r"\d", line):
+            continue
+        words = line.split()
+        if 2 <= len(words) <= 4 and all(word[:1].isalpha() for word in words):
+            return line.title()
+    return ""
+
+
+def detect_email(text: str) -> str:
+    match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", text)
+    return match.group(0) if match else ""
+
+
+def detect_phone(text: str) -> str:
+    candidates = re.findall(r"(?:\+?\d[\d().\-\s]{7,}\d)", text)
+    for candidate in candidates:
+        digits = re.sub(r"\D", "", candidate)
+        if 10 <= len(digits) <= 15 and not re.fullmatch(r"(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}", candidate.strip()):
+            return candidate.strip()
+    return ""
+
+
+def detect_linkedin(text: str) -> str:
+    match = re.search(r"(?:https?://)?(?:www\.)?linkedin\.com/[^\s]+", text, flags=re.IGNORECASE)
+    return clean_url(match.group(0)) if match else ""
+
+
+def detect_github(text: str) -> str:
+    match = re.search(r"(?:https?://)?(?:www\.)?github\.com/[^\s]+", text, flags=re.IGNORECASE)
+    return clean_url(match.group(0)) if match else ""
+
+
+def detect_portfolio(text: str) -> str:
+    urls = re.findall(r"(?:https?://)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*", text)
+    for url in urls:
+        if "linkedin.com" not in url.casefold() and "github.com" not in url.casefold():
+            return clean_url(url)
+    return ""
+
+
+def detect_location(text: str) -> str:
+    match = re.search(r"\b(?:location|address)\s*[:\-]\s*([A-Za-z ,.]+)", text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def clean_url(url: str) -> str:
+    return url.rstrip(".,;)").strip()
+
+
+def detect_age(text: str) -> int | None:
+    age_match = re.search(r"\bage\s*[:\-]?\s*(\d{1,2})\b", text, flags=re.IGNORECASE)
+    if age_match:
+        age = int(age_match.group(1))
+        return age if 14 <= age <= 70 else None
+
+    dob_match = re.search(
+        r"\b(?:dob|date of birth)\s*[:\-]?\s*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not dob_match:
+        return None
+
+    day, month, year = map(int, dob_match.groups())
+    today = date.today()
+    age = today.year - year - ((today.month, today.day) < (month, day))
+    return age if 14 <= age <= 70 else None
+
+
+def detect_gpa(text: str) -> float | None:
+    patterns = [
+        r"\b(?:gpa|cgpa)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*/\s*10\b",
+        r"\b(?:gpa|cgpa)\s*[:\-]?\s*(\d+(?:\.\d+)?)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            value = float(match.group(1))
+            if 0 <= value <= 10:
+                return value
+    return None
+
+
+def detect_degree(education: list[str], text: str) -> str:
+    degree_patterns = [
+        r"\b(B\.?Tech|Bachelor of Technology|BE|B\.?E\.?|BSc|B\.?Sc|BBA|Bachelor of Business Administration|M\.?Tech|Master of Technology|MS|MSc|M\.?Sc|MBA|BCA|MCA)\b",
+    ]
+    search_space = "\n".join(education + [text])
+    for pattern in degree_patterns:
+        match = re.search(pattern, search_space, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).replace(".", "").upper()
+    return ""
+
+
+def detect_branch(education: list[str], text: str) -> str:
+    branches = [
+        "Computer Science",
+        "Artificial Intelligence",
+        "Data Science",
+        "Information Technology",
+        "Electronics",
+        "Mechanical",
+        "Electrical",
+        "Cybersecurity",
+        "Business Analytics",
+        "Marketing",
+        "Finance",
+        "Human Resources",
+        "Operations",
+    ]
+    search_space = "\n".join(education + [text])
+    for branch in branches:
+        if re.search(re.escape(branch), search_space, flags=re.IGNORECASE):
+            return branch
+    return ""
+
+
+def detect_university(education: list[str], text: str) -> str:
+    search_lines = education or text.splitlines()
+    for line in search_lines:
+        if re.search(r"\b(university|college|institute|school)\b", line, flags=re.IGNORECASE):
+            return line.strip()
+    return ""
+
+
+def detect_education_years(education: list[str], text: str) -> tuple[int | None, int | None]:
+    search_space = "\n".join(education + [text])
+    range_match = re.search(r"\b(20\d{2}|19\d{2})\s*(?:-|–|—|to)\s*(20\d{2}|19\d{2})\b", search_space)
+    if range_match:
+        return int(range_match.group(1)), int(range_match.group(2))
+    years = [int(year) for year in re.findall(r"\b(20\d{2}|19\d{2})\b", search_space)]
+    if len(years) >= 2:
+        return min(years), max(years)
+    if len(years) == 1:
+        return None, years[0]
+    return None, None
+
+
+def infer_current_year(start_year: int | None, graduation_year: int | None) -> str:
+    if not start_year or not graduation_year or graduation_year <= start_year:
+        return "Not Specified"
+    duration = graduation_year - start_year
+    if duration < 2 or duration > 6:
+        return "Not Specified"
+    if date.today().year > graduation_year:
+        return "Graduate"
+    year_number = date.today().year - start_year
+    if date.today().year == graduation_year:
+        year_number = duration
+    if year_number < 1 or year_number > duration:
+        return "Not Specified"
+    names = {1: "1st Year", 2: "2nd Year", 3: "3rd Year", 4: "4th Year"}
+    return names.get(year_number, f"Year {year_number}")
+
+
+def calculate_field_confidence(result: ResumeParseResult) -> dict[str, float]:
+    confidence = {
+        "name": 0.9 if result.name else 0.0,
+        "email": 0.98 if result.email else 0.0,
+        "phone": 0.85 if result.phone else 0.0,
+        "linkedin": 0.95 if result.linkedin else 0.0,
+        "github": 0.95 if result.github else 0.0,
+        "portfolio": 0.75 if result.portfolio else 0.0,
+        "location": 0.65 if result.location else 0.0,
+        "degree": 0.9 if result.degree else 0.0,
+        "branch": 0.85 if result.branch else 0.0,
+        "university": 0.8 if result.university else 0.0,
+        "start_year": 0.9 if result.start_year else 0.0,
+        "graduation_year": 0.9 if result.graduation_year else 0.0,
+        "current_year": 0.9 if result.current_year != "Not Specified" else 0.0,
+        "cgpa": 0.95 if result.gpa is not None else 0.0,
+        "skills": min(1.0, len(result.skills) / 6) if result.skills else 0.0,
+        "projects": min(1.0, len(result.projects) / 2) if result.projects else 0.0,
+        "experience": min(1.0, len(result.experience) / 1) if result.experience else 0.0,
+        "certifications": min(1.0, len(result.certifications) / 1) if result.certifications else 0.0,
+    }
+    return confidence
+
+
+def calculate_resume_scores(result: ResumeParseResult, github_score: int = 0) -> dict[str, int]:
+    education = 10 if result.education or result.degree else 0
+    projects = min(len(result.projects), 3) / 3 * 20
+    skills = min(len(result.skills), 12) / 12 * 25
+    experience = min(len(result.experience), 2) / 2 * 15
+    internships = 10 if any("intern" in item.casefold() for item in result.experience) else 0
+    certifications = min(len(result.certifications), 2) / 2 * 10
+    github = min(github_score, 100) * 0.05
+    ats = calculate_ats_score(result) * 0.05
+    resume_strength = round(education + projects + skills + experience + internships + certifications + github + ats)
+    completeness = round(sum([bool(result.name), bool(result.skills), bool(result.education), bool(result.projects), bool(result.experience), bool(result.certifications)]) / 6 * 100)
+    industry = round((skills / 25 * 45) + (projects / 20 * 35) + (experience / 15 * 20))
+    ats_readiness = calculate_ats_score(result)
+    return {
+        "resume_strength": max(0, min(resume_strength, 100)),
+        "resume_completeness": max(0, min(completeness, 100)),
+        "industry_readiness": max(0, min(industry, 100)),
+        "ats_readiness": ats_readiness,
+        "overall_career_readiness": round((resume_strength + completeness + industry + ats_readiness) / 4),
+    }
+
+
+def calculate_ats_score(result: ResumeParseResult) -> int:
+    score = 0
+    score += 20 if result.name else 0
+    score += 20 if result.skills else 0
+    score += 15 if result.education else 0
+    score += 15 if result.projects else 0
+    score += 15 if result.experience else 0
+    score += 10 if result.certifications else 0
+    score += 5 if len(result.text) > 600 else 0
+    return max(0, min(score, 100))
+
+
+def determine_extraction_status(result: ResumeParseResult) -> str:
+    extracted_groups = [
+        bool(result.name),
+        bool(result.skills),
+        bool(result.education),
+        bool(result.certifications),
+        bool(result.projects),
+        bool(result.experience),
+    ]
+    extracted_count = sum(extracted_groups)
+    if not result.text or extracted_count == 0:
+        return "Failed"
+    if result.name and result.skills and extracted_count >= 3:
+        return "Success"
+    return "Partial"
+
+
+def build_resume_insights(result: ResumeParseResult) -> list[str]:
+    insights = []
+    if result.extraction_status == "Failed":
+        return ["No text could be extracted from this resume."]
+
+    if len(result.skills) >= 8:
+        insights.append("Strong skill coverage detected across the resume.")
+    else:
+        insights.append("Add a clearer skills section with tools, languages, and frameworks.")
+
+    if result.projects:
+        insights.append(f"{len(result.projects)} project signal(s) found. Keep outcomes measurable where possible.")
+    else:
+        insights.append("Add 2-3 project entries with problem, tools used, and results.")
+
+    if result.experience:
+        insights.append("Experience or internship content was detected.")
+    else:
+        insights.append("Add internship, freelance, volunteer, or lab experience if available.")
+
+    if result.certifications:
+        insights.append("Certifications are visible and can support credibility.")
+    else:
+        insights.append("Relevant certifications could strengthen the profile for competitive roles.")
+
+    for section_name, values in {
+        "Degree": [result.degree],
+        "Experience": result.experience,
+        "Projects": result.projects,
+        "Skills": result.skills,
+    }.items():
+        if not any(values):
+            insights.append(f"We couldn't confidently extract {section_name}. Please review it manually.")
+
+    return insights
+
+
+def confidence_message(result: ResumeParseResult, field: str, value: object) -> str:
+    if result.field_confidence.get(field, 0.0) < 0.6 or not value:
+        return CONFIDENCE_LOW_MESSAGE
+    return str(value)
+
+
+def detect_impact(text: str) -> str:
+    match = re.search(r"(\d+%|\d+\+?\s*(?:users|students|customers|records|accuracy|reduction|increase))", text, flags=re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def detect_project_role(text: str) -> str:
+    match = re.search(r"\b(?:role|my role)\s*[:\-]\s*([A-Za-z ]+)", text, flags=re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+
+def detect_duration(text: str) -> str:
+    match = re.search(r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*20\d{2}\s*(?:-|–|—|to)\s*(?:present|current|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?[a-z]*\s*20\d{2})\b", text, flags=re.IGNORECASE)
+    return match.group(0) if match else ""
+
+
+def detect_role(text: str) -> str:
+    match = re.search(r"\b([A-Za-z ]*(?:Intern|Engineer|Developer|Analyst|Assistant|Manager|Designer))\b", text, flags=re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+
+def detect_company(text: str) -> str:
+    match = re.search(r"\b(?:at|@)\s+([A-Za-z0-9 .&+-]+)", text, flags=re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+
+def format_project(project: dict[str, str]) -> str:
+    parts = [project.get("name", ""), project.get("tech_stack", ""), project.get("description", ""), project.get("impact", ""), project.get("role", "")]
+    return " | ".join(part for part in parts if part)
+
+
+def format_experience(experience: dict[str, str]) -> str:
+    parts = [
+        experience.get("role", ""),
+        experience.get("company", ""),
+        experience.get("duration", ""),
+        experience.get("responsibilities", ""),
+        experience.get("skills_used", ""),
+        experience.get("achievements", ""),
+    ]
+    return " | ".join(part for part in parts if part)
+
+
+def format_certification(certification: dict[str, str]) -> str:
+    parts = [certification.get("name", ""), certification.get("provider", ""), certification.get("completion_year", "")]
+    return " | ".join(part for part in parts if part)
+
+
+def dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for item in items:
+        key = item.casefold()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+    return deduped
