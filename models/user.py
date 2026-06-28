@@ -13,6 +13,8 @@ class UserProfile:
     projects: list[str] = field(default_factory=list)
     certifications: list[str] = field(default_factory=list)
     internships: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
+    achievements: list[str] = field(default_factory=list)
     weekly_study_hours: int = 0
     career_goal: str = ""
     target_country: str = ""

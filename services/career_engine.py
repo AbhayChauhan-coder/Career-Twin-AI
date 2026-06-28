@@ -12,7 +12,17 @@ CAREERS_PATH = Path(__file__).resolve().parent.parent / "data" / "careers.json"
 
 def load_careers() -> dict[str, dict[str, Any]]:
     with CAREERS_PATH.open("r", encoding="utf-8") as file:
-        return json.load(file)
+        careers = json.load(file)
+
+    from services.career_knowledge import get_career_catalog, get_career_knowledge
+
+    catalog = get_career_catalog()
+    for name, career in catalog.items():
+        careers[name] = {**career, **careers.get(name, {})}
+    for name, career in list(careers.items()):
+        if not career.get("domain"):
+            careers[name] = get_career_knowledge(name, career)
+    return careers
 
 
 def normalize_skill(skill: str) -> str:
@@ -108,6 +118,12 @@ def fallback_roadmap(
                 monthly_learning_task(skill, difficulty),
                 monthly_project_task(skill, career_goal, country),
             ],
+            "weeks": [
+                {"week": "Week 1", "milestone": f"Understand the fundamentals of {skill} and collect role-specific examples."},
+                {"week": "Week 2", "milestone": f"Practice {skill} through two focused exercises or case tasks."},
+                {"week": "Week 3", "milestone": f"Apply {skill} in a small {career_goal or 'career'} portfolio artifact."},
+                {"week": "Week 4", "milestone": f"Document outcomes, update resume bullets, and prepare interview talking points for {skill}."},
+            ],
             "outcome": f"Create a portfolio artifact proving {skill} for {career_goal}.",
         }
         for index, skill in enumerate(focus[:6])
@@ -176,6 +192,18 @@ def adaptive_learning_sequence(career_goal: str, missing_skills: list[str], coun
         base = ["Networking", "Linux", "Security Fundamentals", "SIEM", "Incident Response", "Cloud Security"]
     elif "cloud" in goal or "devops" in goal:
         base = ["Linux", "Docker", "Kubernetes", "CI/CD", "Terraform", "Monitoring"]
+    elif "finance" in goal or "account" in goal or "investment" in goal:
+        base = ["Excel", "Accounting", "Financial Modeling", "Valuation", "Power BI", "Business Communication"]
+    elif "marketing" in goal:
+        base = ["SEO", "Content Strategy", "Campaign Analytics", "Copywriting", "Google Ads", "Portfolio Campaign"]
+    elif "law" in goal or "legal" in goal or "lawyer" in goal:
+        base = ["Legal Research", "Contract Drafting", "Compliance", "Case Analysis", "Legal Writing", "Portfolio Memo"]
+    elif "health" in goal or "medical" in goal or "clinical" in goal:
+        base = ["Healthcare Operations", "Patient Care", "Public Health", "Compliance", "Data Analysis", "Quality Improvement"]
+    elif "teacher" in goal or "education" in goal:
+        base = ["Lesson Planning", "Curriculum Design", "Assessment", "Classroom Management", "Teaching Demo", "Student Feedback"]
+    elif "designer" in goal or "ux" in goal or "creative" in goal:
+        base = ["User Research", "Figma", "Wireframing", "Portfolio Case Study", "Usability Testing", "Presentation"]
     else:
         base = ["Core Role Skills", "Portfolio Project", "Tools Practice", "Deployment", "Interview Prep", "Applications"]
 

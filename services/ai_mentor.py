@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.career_knowledge import (
+    build_transition_plan,
+    discover_careers,
+    interview_preparation,
+    learning_recommendations,
+)
+
 
 def build_mentor_context(
     *,
@@ -42,6 +49,18 @@ def answer_mentor_question(question: str, context: dict[str, Any], history: list
 
     if any(term in normalized for term in ["review my resume", "resume review", "review resume"]):
         return resume_review(context)
+    if any(term in normalized for term in ["career suits", "suits me", "career fit", "what career"]):
+        return career_fit_advice(question, context)
+    if any(term in normalized for term in ["switch", "transition", "change career"]):
+        return transition_advice(question, context)
+    if any(term in normalized for term in ["higher studies", "masters", "mba", "mtech", "study abroad"]):
+        return higher_studies_advice(context)
+    if any(term in normalized for term in ["salary", "expect", "pay"]):
+        return salary_advice(context)
+    if any(term in normalized for term in ["move abroad", "country", "opportunities abroad", "visa"]):
+        return country_advice(context)
+    if any(term in normalized for term in ["companies", "target companies", "where should i apply"]):
+        return company_advice(context)
     if any(term in normalized for term in ["learn next", "next learn", "what should i learn", "learn now"]):
         return learning_advice(context)
     if any(term in normalized for term in ["certification", "certificate", "cert"]):
@@ -105,6 +124,14 @@ def learning_advice(context: dict[str, Any]) -> str:
 
 
 def certification_advice(context: dict[str, Any]) -> str:
+    career_knowledge = context.get("career_knowledge", {})
+    known_certs = career_knowledge.get("preferred_certifications", []) if isinstance(career_knowledge, dict) else []
+    if known_certs:
+        certs = list(known_certs)
+        if context["country"] == "Germany":
+            certs.append("German B1 language certification")
+        return "Best certification path:\n\n" + "\n".join(f"- {cert}" for cert in certs[:4])
+
     goal = context["career_goal"].casefold()
     country = context["country"]
     if "ai" in goal or "machine learning" in goal:
@@ -124,14 +151,12 @@ def certification_advice(context: dict[str, Any]) -> str:
 
 
 def interview_questions(context: dict[str, Any]) -> str:
-    skills = context.get("critical_missing", []) + context.get("resume_skills", [])[:4]
-    questions = [
-        f"Tell me about a project that proves you are ready for {context['career_goal']}.",
-        "Which technical decision did you make in a project, and why?",
-        "What was the hardest bug or blocker you solved?",
-        f"How would you improve your profile for the {context['country']} market?",
-    ]
-    questions.extend(f"Explain {skill} with a practical example." for skill in skills[:4])
+    prep = interview_preparation(str(context["career_goal"]))
+    questions = []
+    questions.extend(prep["hr_questions"][:2])
+    questions.extend(prep["technical_questions"][:4])
+    questions.extend(prep["case_study_questions"][:2])
+    questions.append(f"How would you improve your profile for the {context['country']} market?")
     return "Practice these interview questions:\n\n" + "\n".join(f"- {question}" for question in questions)
 
 
@@ -175,12 +200,88 @@ def roadmap_advice(context: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def career_fit_advice(question: str, context: dict[str, Any]) -> str:
+    profile_like = type(
+        "ProfileLike",
+        (),
+        {
+            "degree": "",
+            "branch": context.get("detected_domain", ""),
+            "skills": context.get("resume_skills", []),
+            "projects": context.get("projects", []),
+        },
+    )()
+    recommendations = discover_careers(question + " " + " ".join(context.get("resume_skills", [])), profile_like)
+    if not recommendations:
+        return f"Your strongest current direction is {context['career_goal']} because it matches the dashboard context and current skill signals."
+    lines = ["Career paths that fit your current signals:"]
+    for item in recommendations:
+        lines.append(f"- {item.career} ({item.fit_score}%): {item.explanation}")
+    return "\n".join(lines)
+
+
+def transition_advice(question: str, context: dict[str, Any]) -> str:
+    background = context.get("detected_domain") or "current background"
+    plan = build_transition_plan(str(background), str(context["career_goal"]))
+    lines = [
+        f"Transition: {plan['from_domain']} -> {plan['to_domain']}",
+        f"Difficulty: {plan['difficulty']}. Timeline: {plan['timeline']}. Success Probability: {plan['success_probability']}%.",
+        f"Why: {plan['why']}",
+        "Roadmap:",
+    ]
+    lines.extend(f"- {step}" for step in plan["roadmap"][:5])
+    if plan["required_certifications"]:
+        lines.append("Certifications: " + ", ".join(plan["required_certifications"][:3]) + ".")
+    return "\n".join(lines)
+
+
+def higher_studies_advice(context: dict[str, Any]) -> str:
+    career = context.get("career_knowledge", {})
+    degrees = career.get("degree_requirements", []) if isinstance(career, dict) else []
+    return (
+        f"For {context['career_goal']}, higher studies are useful if they directly improve access to roles, visas, research, or regulated credentials.\n\n"
+        + "Relevant degree directions: "
+        + (", ".join(degrees[:4]) if degrees else "a role-specific master's or professional diploma")
+        + ".\n\nIf you can build strong projects and internships faster, prioritize proof first; choose higher studies when the target country or role expects credentials."
+    )
+
+
+def salary_advice(context: dict[str, Any]) -> str:
+    country = context.get("country")
+    demand = context.get("country_demand") or "market dependent"
+    career = context.get("career_knowledge", {})
+    salary = career.get("salary", "market dependent") if isinstance(career, dict) else "market dependent"
+    return f"For {context['career_goal']} in {country}, salary is {salary} and demand is {demand}. Your actual range depends on portfolio proof, internships, interview quality, and local hiring standards."
+
+
+def country_advice(context: dict[str, Any]) -> str:
+    skills = context.get("country_skills", [])
+    return (
+        f"For {context['career_goal']}, {context['country']} currently shows {context.get('country_demand') or 'market'} demand.\n\n"
+        + "Improve country fit by proving: "
+        + (", ".join(skills[:5]) if skills else "role skills, communication, and portfolio outcomes")
+        + ". Also check visa rules, language expectations, and local salary bands before applying."
+    )
+
+
+def company_advice(context: dict[str, Any]) -> str:
+    career = context.get("career_knowledge", {})
+    companies = career.get("hiring_companies", []) if isinstance(career, dict) else []
+    if not companies:
+        companies = ["role-specific startups", "consulting firms", "large employers in your target country"]
+    return "Target companies and employer types:\n\n" + "\n".join(f"- {company}" for company in companies[:6])
+
+
 def general_answer(context: dict[str, Any], history: list[dict[str, str]]) -> str:
     memory_note = ""
     if history:
         memory_note = "I am using our previous messages in this session, plus your current dashboard context.\n\n"
+    topics = "career fit, switching careers, higher studies, certifications, salary, country choice, companies, interviews"
+    if context.get("detected_domain") == "Technology":
+        topics += ", GitHub"
+    topics += ", or Resume Match Score"
     return (
         memory_note
         + f"You are targeting **{context['career_goal']}** in **{context['country']}**. "
-        + "Ask me to review your resume, improve your GitHub, plan certifications, prepare interviews, or raise your Resume Match Score."
+        + f"Ask me about {topics}."
     )

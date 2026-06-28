@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
+from services.career_knowledge import (
+    career_skill_terms,
+    categorize_skills_for_domain,
+    detect_candidate_domain,
+)
+
 
 COMMON_SKILLS = {
     "AWS",
@@ -78,6 +84,49 @@ COMMON_SKILLS = {
     "English",
     "Hindi",
     "German",
+    "Legal Research",
+    "Contract Drafting",
+    "Compliance",
+    "Litigation",
+    "Case Analysis",
+    "Legal Writing",
+    "Patient Care",
+    "Clinical Research",
+    "Medical Terminology",
+    "Public Health",
+    "Pharmacology",
+    "Research Methods",
+    "Literature Review",
+    "Academic Writing",
+    "Laboratory Techniques",
+    "Lesson Planning",
+    "Curriculum Design",
+    "Assessment",
+    "Classroom Management",
+    "Market Research",
+    "Campaign Analytics",
+    "Copywriting",
+    "Brand Strategy",
+    "Recruitment",
+    "HR Analytics",
+    "Employee Relations",
+    "CAD",
+    "AutoCAD",
+    "SolidWorks",
+    "MATLAB",
+    "Revit",
+    "SketchUp",
+    "Guest Relations",
+    "Hotel Operations",
+    "Event Planning",
+    "Crop Science",
+    "Soil Science",
+    "Agri Business",
+    "Current Affairs",
+    "Policy Analysis",
+    "Essay Writing",
+    "Customer Discovery",
+    "Pitching",
 }
 
 SKILL_CATEGORIES = {
@@ -132,6 +181,8 @@ class ResumeParseResult:
     graduation_year: int | None = None
     current_year: str = "Not Specified"
     gpa: float | None = None
+    current_designation: str = ""
+    designation_confidence: float = 0.0
     extraction_status: str = "Failed"
     strength_score: int = 0
     completeness_score: int = 0
@@ -144,6 +195,9 @@ class ResumeParseResult:
     structured_certifications: list[dict[str, str]] = field(default_factory=list)
     field_confidence: dict[str, float] = field(default_factory=dict)
     insights: list[str] = field(default_factory=list)
+    detected_domain: str = "General"
+    domain_confidence: float = 0.0
+    domain_scores: dict[str, int] = field(default_factory=dict)
 
     def autofill(self) -> dict[str, Any]:
         return {
@@ -257,6 +311,18 @@ def parse_resume_text(text: str, careers: dict[str, dict[str, Any]]) -> ResumePa
     result.university = detect_university(result.education, normalized_text)
     result.start_year, result.graduation_year = detect_education_years(result.education, normalized_text)
     result.current_year = infer_current_year(result.start_year, result.graduation_year)
+    result.current_designation, result.designation_confidence = detect_current_designation(
+        normalized_text,
+        result.structured_experience,
+        careers,
+    )
+    result.detected_domain, result.domain_confidence, result.domain_scores = detect_candidate_domain(
+        normalized_text,
+        result.skills,
+        result.degree,
+        result.branch,
+    )
+    result.skill_categories = categorize_skills_for_domain(result.skills, result.detected_domain) or categorize_skills(result.skills)
     result.field_confidence = calculate_field_confidence(result)
     result.extraction_status = determine_extraction_status(result)
     scores = calculate_resume_scores(result)
@@ -284,9 +350,66 @@ def normalize_text(text: str) -> str:
 
 def build_skill_bank(careers: dict[str, dict[str, Any]]) -> list[str]:
     skills = set(COMMON_SKILLS)
+    skills.update(career_skill_terms())
     for career in careers.values():
         skills.update(career.get("required_skills", []))
+        skills.update(career.get("technical_skills", []))
+        skills.update(career.get("soft_skills", []))
     return sorted(skills, key=lambda value: (-len(value), value.casefold()))
+
+
+def detect_current_designation(
+    text: str,
+    structured_experience: list[dict[str, str]],
+    careers: dict[str, dict[str, Any]],
+) -> tuple[str, float]:
+    for experience in structured_experience:
+        role = (experience.get("role") or "").strip()
+        if role:
+            return role, 0.86
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    labels = [
+        "current role",
+        "current designation",
+        "designation",
+        "job title",
+        "position",
+        "role",
+        "title",
+    ]
+    role_names = sorted(careers.keys(), key=lambda value: (-len(value), value.casefold()))
+    for line in lines[:60]:
+        lower = line.casefold()
+        for label in labels:
+            if label in lower:
+                tail = re.split(r":|-|–|—", line, maxsplit=1)
+                candidate_text = tail[-1] if len(tail) > 1 else line
+                matched = match_known_role(candidate_text, role_names)
+                if matched:
+                    return matched, 0.92
+                cleaned = re.sub(r"(?i)\b(current role|current designation|designation|job title|position|role|title)\b", "", candidate_text)
+                cleaned = cleaned.strip(" :-–—|")
+                if 3 <= len(cleaned) <= 80:
+                    return cleaned, 0.72
+
+    for line in lines[:80]:
+        matched = match_known_role(line, role_names)
+        if matched:
+            return matched, 0.82
+    matched = match_known_role(text, role_names)
+    if matched:
+        return matched, 0.68
+    return "", 0.0
+
+
+def match_known_role(text: str, role_names: list[str]) -> str:
+    normalized = text.casefold()
+    for role in role_names:
+        pattern = r"(?<![a-z0-9])" + re.escape(role.casefold()) + r"(?![a-z0-9])"
+        if re.search(pattern, normalized):
+            return role
+    return ""
 
 
 def detect_skills(text: str, skill_bank: list[str]) -> list[str]:
@@ -500,7 +623,7 @@ def detect_gpa(text: str) -> float | None:
 
 def detect_degree(education: list[str], text: str) -> str:
     degree_patterns = [
-        r"\b(B\.?Tech|Bachelor of Technology|BE|B\.?E\.?|BSc|B\.?Sc|BBA|Bachelor of Business Administration|M\.?Tech|Master of Technology|MS|MSc|M\.?Sc|MBA|BCA|MCA)\b",
+        r"\b(B\.?Tech|Bachelor of Technology|BE|B\.?E\.?|BSc|B\.?Sc|MSc|M\.?Sc|BBA|Bachelor of Business Administration|MBA|BCom|B\.?Com|MCom|M\.?Com|LLB|LLM|MBBS|BDS|BPharm|B\.?Pharm|BEd|B\.?Ed|BA|B\.?A\.?|MA|M\.?A\.?|BArch|B\.?Arch|M\.?Tech|Master of Technology|MS|BCA|MCA)\b",
     ]
     search_space = "\n".join(education + [text])
     for pattern in degree_patterns:
@@ -525,6 +648,42 @@ def detect_branch(education: list[str], text: str) -> str:
         "Finance",
         "Human Resources",
         "Operations",
+        "Commerce",
+        "Accounting",
+        "Banking",
+        "Investment",
+        "Corporate Law",
+        "Criminal Law",
+        "Civil Law",
+        "Intellectual Property",
+        "Cyber Law",
+        "Medicine",
+        "Nursing",
+        "Pharmacy",
+        "Physiotherapy",
+        "Biotechnology",
+        "Public Health",
+        "Psychology",
+        "Sociology",
+        "Political Science",
+        "History",
+        "Economics",
+        "English",
+        "Journalism",
+        "Photography",
+        "Graphic Design",
+        "Animation",
+        "UI UX",
+        "Fashion Design",
+        "Physics",
+        "Chemistry",
+        "Mathematics",
+        "Statistics",
+        "Biology",
+        "Education",
+        "Hotel Management",
+        "Architecture",
+        "Agriculture",
     ]
     search_space = "\n".join(education + [text])
     for branch in branches:
@@ -587,10 +746,12 @@ def calculate_field_confidence(result: ResumeParseResult) -> dict[str, float]:
         "graduation_year": 0.9 if result.graduation_year else 0.0,
         "current_year": 0.9 if result.current_year != "Not Specified" else 0.0,
         "cgpa": 0.95 if result.gpa is not None else 0.0,
+        "current_designation": result.designation_confidence,
         "skills": min(1.0, len(result.skills) / 6) if result.skills else 0.0,
         "projects": min(1.0, len(result.projects) / 2) if result.projects else 0.0,
         "experience": min(1.0, len(result.experience) / 1) if result.experience else 0.0,
         "certifications": min(1.0, len(result.certifications) / 1) if result.certifications else 0.0,
+        "detected_domain": result.domain_confidence,
     }
     return confidence
 
