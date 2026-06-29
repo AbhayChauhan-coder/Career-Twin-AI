@@ -16,6 +16,20 @@ SUPPORTED_COUNTRIES = [
     "Japan",
     "France",
     "Netherlands",
+    "Sweden",
+    "Switzerland",
+    "New Zealand",
+    "South Korea",
+    "Italy",
+    "Spain",
+    "Belgium",
+    "Norway",
+    "Denmark",
+    "Finland",
+    "Ireland",
+    "Austria",
+    "Portugal",
+    "Poland",
 ]
 
 
@@ -165,6 +179,244 @@ DEFAULT_CATEGORY_MARKETS = {
     "Engineering": {"demand": "High", "entry": "45-65", "mid": "70-105", "senior": "115-170"},
     "Government": {"demand": "Medium", "entry": "35-55", "mid": "60-95", "senior": "100-160"},
     "General": {"demand": "Medium", "entry": "38-58", "mid": "62-92", "senior": "100-150"},
+}
+
+
+PROFESSION_MARKET_PROFILES = {
+    "Software": {
+        "skills": ["DSA", "System Design", "Cloud", "DevOps", "Testing", "Git"],
+        "companies": ["Google", "Microsoft", "Amazon", "Infosys", "TCS", "Atlassian"],
+        "certifications": ["AWS Cloud Practitioner", "Meta Back-End Developer", "Oracle Java", "Scrum Fundamentals"],
+        "interview": ["Resume Screening", "Online Coding Assessment", "Technical Interview", "System Design Round", "HR Interview"],
+        "future_demand": "Product engineering, platform modernization, cloud migration, and secure digital services continue to drive software hiring.",
+        "market_insights": [
+            "Employers value clean code, debugging ability, system thinking, and shipped projects.",
+            "Backend, cloud, mobile, and full-stack teams remain active across product and services companies.",
+        ],
+        "programming_languages": ["Python", "Java", "JavaScript", "TypeScript"],
+        "frameworks": ["React", "FastAPI", "Spring Boot", "Docker"],
+    },
+    "AI": {
+        "skills": ["Python", "Machine Learning", "Deep Learning", "MLOps", "Model Evaluation", "LLMs"],
+        "companies": ["OpenAI", "NVIDIA", "Google", "Microsoft", "Fractal", "Turing"],
+        "certifications": ["DeepLearning.AI Machine Learning", "AWS Machine Learning Specialty", "Google Professional ML Engineer"],
+        "interview": ["Resume Screening", "ML Fundamentals Round", "Modeling Case", "Deployment Discussion", "HR Interview"],
+        "future_demand": "Automation, generative AI adoption, model deployment, and AI governance are expanding demand for applied AI talent.",
+        "market_insights": [
+            "Production proof matters more than notebook-only projects.",
+            "Model evaluation, data quality, deployment, and business impact separate stronger candidates.",
+        ],
+        "programming_languages": ["Python", "SQL"],
+        "frameworks": ["PyTorch", "TensorFlow", "FastAPI", "Docker"],
+    },
+    "Data": {
+        "skills": ["Machine Learning", "Statistics", "Python", "SQL", "Data Visualization", "Experiment Design"],
+        "companies": ["Fractal", "Mu Sigma", "Deloitte", "Amazon", "RBC", "ZS Associates"],
+        "certifications": ["Google Data Analytics", "Microsoft PL-300", "IBM Data Science"],
+        "interview": ["Resume Screening", "Statistics Round", "SQL/Python Assessment", "Business Case", "HR Interview"],
+        "future_demand": "Decision automation, analytics modernization, and data-driven operations continue to increase demand.",
+        "market_insights": [
+            "Hiring managers look for business context, clean analysis, and clear storytelling.",
+            "Dashboards, SQL depth, and statistical reasoning are strong market signals.",
+        ],
+        "programming_languages": ["Python", "SQL", "R"],
+        "frameworks": ["Pandas", "Power BI", "Tableau"],
+    },
+    "Cybersecurity": {
+        "skills": ["Pen Testing", "SOC", "Incident Response", "SIEM", "Threat Intelligence", "Cloud Security"],
+        "companies": ["CrowdStrike", "Palo Alto Networks", "Deloitte", "EY", "Wipro", "Tata Communications"],
+        "certifications": ["CompTIA Security+", "CEH", "CISSP", "Splunk Core"],
+        "interview": ["Resume Screening", "Security Fundamentals Round", "Scenario Assessment", "Incident Response Discussion", "HR Interview"],
+        "future_demand": "Rising cyber risk, compliance pressure, cloud adoption, and ransomware defense are driving security hiring.",
+        "market_insights": [
+            "Hands-on labs, incident writeups, and detection rules make security profiles stronger.",
+            "SOC, cloud security, application security, and GRC remain active hiring areas.",
+        ],
+        "programming_languages": ["Python", "Bash", "PowerShell"],
+        "frameworks": ["MITRE ATT&CK", "NIST CSF", "SIEM"],
+    },
+    "Cloud": {
+        "skills": ["Cloud Platforms", "Linux", "Docker", "Kubernetes", "Terraform", "CI/CD"],
+        "companies": ["AWS Partners", "Microsoft", "Google Cloud", "Accenture", "Capgemini", "Infosys"],
+        "certifications": ["AWS Solutions Architect", "Azure Administrator", "Google Associate Cloud Engineer", "CKA"],
+        "interview": ["Resume Screening", "Cloud Architecture Round", "Infrastructure Task", "Operations Scenario", "HR Interview"],
+        "future_demand": "Migration, modernization, cost optimization, and resilient infrastructure continue to drive cloud roles.",
+        "market_insights": [
+            "Infrastructure as code, monitoring, and incident handling are key differentiators.",
+            "Employers prefer candidates who can explain tradeoffs, reliability, and security.",
+        ],
+        "programming_languages": ["Python", "Bash", "Go"],
+        "frameworks": ["Docker", "Kubernetes", "Terraform"],
+    },
+    "Healthcare": {
+        "skills": ["Patient Care", "Clinical Assessment", "Medication Administration", "Infection Control", "Clinical Documentation"],
+        "companies": ["Apollo Hospitals", "Fortis", "Max Healthcare", "Narayana Health", "Manipal Hospitals", "NHS"],
+        "certifications": ["BLS", "ACLS", "Infection Control", "Critical Care Nursing", "Clinical Pharmacy"],
+        "interview": ["Resume Screening", "HR Interview", "Clinical Assessment", "Practical Test", "Department Interview"],
+        "future_demand": "Aging populations, hospital expansion, preventive healthcare, and increasing patient volumes continue to drive demand.",
+        "market_insights": [
+            "Hospitals value patient safety, clinical judgment, documentation, and shift readiness.",
+            "Specialized clinical certifications improve access to stronger departments and senior roles.",
+        ],
+        "programming_languages": [],
+        "frameworks": [],
+    },
+    "Finance": {
+        "skills": ["Financial Reporting", "Taxation", "Audit", "SAP", "IFRS", "Financial Modeling"],
+        "companies": ["Deloitte", "PwC", "EY", "KPMG", "JP Morgan", "HDFC Bank"],
+        "certifications": ["CA", "CFA Level 1", "FMVA", "ACCA", "NISM"],
+        "interview": ["Resume Screening", "Finance Technical Round", "Excel/Case Assessment", "Manager Interview", "HR Interview"],
+        "future_demand": "Regulatory compliance, digital finance, audit quality, risk management, and business expansion are increasing demand.",
+        "market_insights": [
+            "Employers value accuracy, controls, reporting discipline, and business judgment.",
+            "ERP exposure, statutory knowledge, and financial modeling improve senior progression.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Excel", "Power BI", "SAP", "Tally"],
+    },
+    "Marketing": {
+        "skills": ["SEO", "Branding", "Campaign Management", "Digital Marketing", "Analytics", "Copywriting"],
+        "companies": ["Ogilvy", "WPP", "Dentsu", "HubSpot", "Nykaa", "Zomato"],
+        "certifications": ["Google Ads", "HubSpot Content Marketing", "Meta Blueprint", "Google Analytics"],
+        "interview": ["Resume Screening", "Portfolio Review", "Campaign Case", "Manager Interview", "HR Interview"],
+        "future_demand": "Brand growth, digital channels, performance marketing, and customer retention continue to drive marketing demand.",
+        "market_insights": [
+            "Campaign outcomes, audience insight, and creative testing matter more than generic tool lists.",
+            "SEO, paid media, brand strategy, and analytics remain high-value proof areas.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Google Analytics", "Google Ads", "Meta Ads", "HubSpot"],
+    },
+    "Law": {
+        "skills": ["Litigation", "Corporate Law", "Legal Research", "Contract Drafting", "Compliance", "Advocacy"],
+        "companies": ["Khaitan & Co", "Trilegal", "Cyril Amarchand Mangaldas", "AZB", "Shardul Amarchand"],
+        "certifications": ["Contract Drafting", "Corporate Law", "Compliance", "Intellectual Property Law"],
+        "interview": ["Resume Screening", "Legal Research Round", "Drafting Test", "Case Discussion", "Partner Interview"],
+        "future_demand": "Compliance, contracts, dispute resolution, privacy regulation, and transaction support continue to create legal demand.",
+        "market_insights": [
+            "Strong drafting samples, case reasoning, and statutory clarity improve hiring outcomes.",
+            "Domain specialization helps lawyers progress into counsel and partner tracks.",
+        ],
+        "programming_languages": [],
+        "frameworks": [],
+    },
+    "Engineering": {
+        "skills": ["CAD", "Manufacturing", "Quality Control", "Safety", "Project Planning", "Technical Documentation"],
+        "companies": ["Larsen & Toubro", "Siemens", "Bosch", "Tata Motors", "Schneider Electric", "ABB"],
+        "certifications": ["AutoCAD Professional", "Six Sigma", "PMP Foundation", "Safety Certification"],
+        "interview": ["Resume Screening", "Core Engineering Round", "Design/Process Task", "Site or Plant Scenario", "HR Interview"],
+        "future_demand": "Infrastructure investment, manufacturing modernization, energy systems, and automation continue to support engineering demand.",
+        "market_insights": [
+            "Employers value fundamentals, safety awareness, documentation, and applied project proof.",
+            "CAD, simulation, quality, and project controls improve progression.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["AutoCAD", "SolidWorks", "MATLAB", "ANSYS"],
+    },
+    "Architecture": {
+        "skills": ["BIM", "Revit", "Urban Planning", "Building Codes", "Sustainable Design", "Client Presentation"],
+        "companies": ["Hafeez Contractor", "CP Kukreja", "Gensler", "AECOM", "HOK", "SOM"],
+        "certifications": ["Revit Architecture", "Green Building Certification", "BIM Professional"],
+        "interview": ["Resume Screening", "Portfolio Review", "Design Critique", "Technical Drawing Discussion", "Client Scenario"],
+        "future_demand": "Urban expansion, sustainable design, real estate redevelopment, and BIM adoption continue to drive architecture demand.",
+        "market_insights": [
+            "Portfolio quality, drawings, BIM fluency, and client communication decide most shortlists.",
+            "Sustainability and building-code literacy improve senior opportunities.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Revit", "AutoCAD", "SketchUp", "BIM"],
+    },
+    "Education": {
+        "skills": ["Curriculum Development", "Classroom Management", "Assessment", "Pedagogy", "Student Counseling"],
+        "companies": ["Schools", "Universities", "Byju's", "Unacademy", "Coursera Partners", "Public Education Departments"],
+        "certifications": ["BEd", "TESOL", "Google Certified Educator", "Subject Teaching Certificate"],
+        "interview": ["Resume Screening", "Teaching Demo", "Subject Knowledge Round", "Classroom Scenario", "Panel Interview"],
+        "future_demand": "Education reforms, online learning, skill-based programs, and STEM education are increasing demand.",
+        "market_insights": [
+            "Lesson quality, student outcomes, assessment design, and communication are key signals.",
+            "Digital teaching ability and subject depth improve long-term growth.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["LMS", "Assessment Rubrics", "Digital Content Tools"],
+    },
+    "Business": {
+        "skills": ["Operations", "Stakeholder Management", "Sales", "CRM", "Process Improvement", "Negotiation"],
+        "companies": ["Deloitte", "Accenture", "Tata Group", "Reliance Retail", "Amazon", "Flipkart"],
+        "certifications": ["Google Project Management", "Six Sigma", "Business Analytics", "CRM Certification"],
+        "interview": ["Resume Screening", "Business Case", "Role Scenario", "Manager Interview", "HR Interview"],
+        "future_demand": "Business expansion, process improvement, customer growth, and operating efficiency continue to drive demand.",
+        "market_insights": [
+            "Employers value measurable business outcomes, coordination, and ownership.",
+            "Process metrics, CRM proof, and stakeholder stories strengthen business profiles.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["CRM", "Excel", "Power BI", "Project Management Tools"],
+    },
+    "Creative": {
+        "skills": ["Visual Design", "Storytelling", "Portfolio Development", "Brand Systems", "Client Communication"],
+        "companies": ["WPP", "Dentsu", "Ogilvy", "Netflix", "Disney", "Canva"],
+        "certifications": ["Adobe Certified Professional", "Google UX Design", "Figma Design", "Content Strategy"],
+        "interview": ["Resume Screening", "Portfolio Review", "Creative Task", "Design Critique", "Client Scenario"],
+        "future_demand": "Digital content, brand experience, product design, and media growth continue to support creative demand.",
+        "market_insights": [
+            "Portfolio originality, process clarity, and execution quality drive hiring decisions.",
+            "Candidates with measurable campaign or product outcomes stand out.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Figma", "Adobe Creative Cloud", "Canva"],
+    },
+    "Hospitality": {
+        "skills": ["Guest Relations", "Hotel Operations", "Food Safety", "Service Recovery", "Event Planning"],
+        "companies": ["Taj Hotels", "Oberoi Hotels", "Marriott", "Hilton", "Accor", "Emirates"],
+        "certifications": ["Food Safety", "Hospitality Management", "Revenue Management", "Event Management"],
+        "interview": ["Resume Screening", "Service Scenario", "Operations Interview", "Guest Handling Roleplay", "HR Interview"],
+        "future_demand": "Tourism recovery, premium guest experience, events, and travel growth continue to drive hospitality demand.",
+        "market_insights": [
+            "Service quality, complaint handling, and operational discipline decide hiring strength.",
+            "Food safety, revenue management, and guest-experience metrics improve growth.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["PMS Tools", "Revenue Management", "Food Safety SOPs"],
+    },
+    "Agriculture": {
+        "skills": ["Crop Management", "Soil Science", "Agri Business", "Food Technology", "Sustainability"],
+        "companies": ["ICAR", "IFFCO", "Amul", "ITC Agri", "Syngenta", "Cargill"],
+        "certifications": ["Agri Business", "Food Safety", "Supply Chain Analytics", "Soil Health"],
+        "interview": ["Resume Screening", "Field Knowledge Round", "Crop/Soil Case", "Operations Discussion", "HR Interview"],
+        "future_demand": "Food security, agri supply chains, precision farming, and sustainability needs continue to drive demand.",
+        "market_insights": [
+            "Field exposure, crop knowledge, and market-linkage understanding matter strongly.",
+            "Food technology and sustainability skills improve growth options.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["GIS Basics", "Food Safety Standards", "Supply Chain Tools"],
+    },
+    "Government": {
+        "skills": ["Public Administration", "Policy Analysis", "Current Affairs", "Ethics", "Public Communication"],
+        "companies": ["Government Departments", "Public Sector Units", "Municipal Bodies", "UN Agencies", "Think Tanks"],
+        "certifications": ["Public Policy", "Governance", "Project Management", "Data for Public Policy"],
+        "interview": ["Application Screening", "Written/Role Assessment", "Current Affairs Discussion", "Ethics Scenario", "Panel Interview"],
+        "future_demand": "Public service delivery, regulation, infrastructure programs, and social-sector implementation sustain demand.",
+        "market_insights": [
+            "Policy clarity, public communication, ethics, and execution experience improve fit.",
+            "Domain knowledge and documentation discipline are strong differentiators.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Policy Frameworks", "Program Evaluation", "Public Finance"],
+    },
+    "Science": {
+        "skills": ["Research Methods", "Laboratory Techniques", "Statistics", "Academic Writing", "Data Analysis"],
+        "companies": ["CSIR", "ICMR", "ISRO", "Universities", "Biocon", "Research Labs"],
+        "certifications": ["Research Methods", "Laboratory Safety", "Biostatistics", "Good Clinical Practice"],
+        "interview": ["Resume Screening", "Research Discussion", "Methods Round", "Literature Critique", "Panel Interview"],
+        "future_demand": "R&D investment, clinical studies, sustainability research, and applied science programs continue to drive demand.",
+        "market_insights": [
+            "Publication quality, methods rigor, and lab or field proof strengthen research profiles.",
+            "Grant writing, statistics, and reproducibility improve senior progression.",
+        ],
+        "programming_languages": [],
+        "frameworks": ["Research Design", "Statistics Tools", "Lab Protocols"],
+    },
 }
 
 
@@ -391,22 +643,31 @@ def get_country_career_intelligence(
 ) -> CountryCareerIntelligence:
     selected_country = country if country in COUNTRY_MARKET_DATA else "India"
     country_data = COUNTRY_MARKET_DATA[selected_country]
-    category = categorize_career(career_name)
-    domain = career_definition.get("domain", "")
+    domain = str(career_definition.get("domain", "General") or "General")
+    category = categorize_career(career_name, career_definition)
+    market_profile = profession_market_profile(category, domain)
     market = country_data["categories"].get(
         category,
-        country_data["categories"].get("General", country_data["categories"].get("Software")),
+        country_data["categories"].get(domain, country_data["categories"].get("General", country_data["categories"].get("Software"))),
     )
     required_skills = career_definition.get("required_skills", [])
-    most_required_skills = (required_skills[:4] + country_data["country_skills"])[:7]
+    most_required_skills = dedupe_list(required_skills[:5] + market_profile["skills"])[:7]
     is_technology = domain == "Technology" or (not domain and category in {"AI", "Data", "Cybersecurity", "Cloud", "Software"})
-    top_companies = career_definition.get("top_hiring_companies") or career_definition.get("hiring_companies") or country_data["top_hiring_companies"]
+    top_companies = dedupe_list(
+        (career_definition.get("top_hiring_companies") or career_definition.get("hiring_companies") or [])
+        + market_profile["companies"]
+    )[:8]
     certifications = (
         career_definition.get("certifications")
         or career_definition.get("preferred_certifications")
         or career_definition.get("recommended_certifications")
-        or country_data["certifications"]
+        or market_profile["certifications"]
     )
+    certifications = dedupe_list(list(certifications) + market_profile["certifications"])[:8]
+    interview_process = career_definition.get("interview_pattern") or market_profile["interview"]
+    interview_process = dedupe_list(interview_process)[:6]
+    future_demand = profession_future_demand(career_name, category, domain, market_profile)
+    frameworks = career_definition.get("frameworks") or market_profile["frameworks"]
 
     intelligence = CountryCareerIntelligence(
         country=selected_country,
@@ -419,31 +680,39 @@ def get_country_career_intelligence(
         top_hiring_companies=top_companies,
         most_required_skills=most_required_skills,
         most_valuable_certifications=certifications,
-        most_valuable_programming_languages=country_data["programming_languages"] if is_technology else [],
-        most_valuable_frameworks=career_definition.get("frameworks", country_data["frameworks"] if is_technology else []),
+        most_valuable_programming_languages=market_profile["programming_languages"] if is_technology else [],
+        most_valuable_frameworks=frameworks if is_technology else market_profile["frameworks"],
         visa_difficulty=country_data["visa_difficulty"],
         market_growth=country_data["market_growth"],
-        interview_process=country_data["interview_process"],
-        future_demand=country_data["future_demand"],
+        interview_process=interview_process,
+        future_demand=future_demand,
         cost_of_living=country_data.get("cost_of_living", "Medium"),
         language_requirements=country_data.get("language_requirements", ["English helpful for global roles"]),
-        interview_style=", ".join(country_data["interview_process"][:2]),
+        interview_style=", ".join(interview_process[:2]),
         career_growth=country_data.get("market_growth", "Medium"),
         insights=[],
     )
-    intelligence.insights = build_country_insights(intelligence, category)
+    intelligence.insights = build_country_insights(intelligence, category, market_profile)
     return intelligence
 
 
-def categorize_career(career_name: str) -> str:
+def categorize_career(career_name: str, career_definition: dict[str, Any] | None = None) -> str:
     normalized = career_name.casefold()
-    priority_categories = ["Finance", "Marketing", "Law", "Healthcare", "Education", "Engineering", "Government"]
+    priority_categories = ["Finance", "Marketing", "Law", "Healthcare", "Education", "Engineering", "Government", "Cybersecurity", "Cloud", "AI", "Data"]
     for category in priority_categories:
         if any(keyword in normalized for keyword in CAREER_CATEGORY_KEYWORDS.get(category, [])):
             return category
     for category, keywords in CAREER_CATEGORY_KEYWORDS.items():
         if any(keyword in normalized for keyword in keywords):
             return category
+    if career_definition:
+        domain = str(career_definition.get("domain", "") or "")
+        if domain:
+            return {
+                "Technology": "Software",
+                "Creative": "Design",
+                "Business": "Product",
+            }.get(domain, domain)
     try:
         from services.career_knowledge import get_career_knowledge
 
@@ -455,6 +724,36 @@ def categorize_career(career_name: str) -> str:
         }.get(domain, domain or "General")
     except Exception:
         return "General"
+
+
+def profession_market_profile(category: str, domain: str) -> dict[str, Any]:
+    """Return the isolated market dataset for the selected profession family."""
+    if category in PROFESSION_MARKET_PROFILES:
+        return PROFESSION_MARKET_PROFILES[category]
+    if domain in PROFESSION_MARKET_PROFILES:
+        return PROFESSION_MARKET_PROFILES[domain]
+    return PROFESSION_MARKET_PROFILES["Business"]
+
+
+def profession_future_demand(career_name: str, category: str, domain: str, profile: dict[str, Any]) -> str:
+    base = str(profile["future_demand"])
+    if career_name and career_name.casefold() not in base.casefold():
+        return f"For {career_name}, {base[0].lower() + base[1:]}"
+    return base
+
+
+def dedupe_list(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            continue
+        key = text.casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(text)
+    return result
 
 
 def format_salary(country_data: dict[str, Any], salary_range: str) -> str:
@@ -474,19 +773,18 @@ def salary_midpoint(value: str) -> int:
     return numbers[0] if numbers else 0
 
 
-def build_country_insights(intelligence: CountryCareerIntelligence, category: str) -> list[str]:
+def build_country_insights(intelligence: CountryCareerIntelligence, category: str, market_profile: dict[str, Any]) -> list[str]:
     insights = [
         f"{intelligence.career} in {intelligence.country} has {intelligence.demand_level.lower()} demand with {intelligence.market_growth.lower()} market growth.",
-        f"Remote job availability is {intelligence.remote_jobs.lower()}, so portfolio proof and communication skills affect opportunity quality.",
+        f"Remote job availability is {intelligence.remote_jobs.lower()}, so profession-specific proof and communication skills affect opportunity quality.",
         f"Focus on {', '.join(intelligence.most_required_skills[:3])} first to improve local market fit.",
         f"Future demand: {intelligence.future_demand}",
     ]
+    insights.extend(market_profile.get("market_insights", [])[:2])
     if intelligence.visa_difficulty == "High":
         insights.append("Visa difficulty is high, so strong portfolio proof and employer sponsorship readiness matter.")
     elif intelligence.visa_difficulty == "Medium":
         insights.append("Visa difficulty is manageable, but local language, documentation, and relevant experience improve outcomes.")
     else:
         insights.append("Visa difficulty is low for local candidates, so skills and portfolio quality become the main differentiators.")
-    if category == "AI":
-        insights.append("A deployed AI project with API, model evaluation, and clear business use case will stand out.")
     return insights

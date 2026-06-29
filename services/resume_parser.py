@@ -148,14 +148,41 @@ SKILL_CATEGORIES = {
 
 
 SECTION_ALIASES = {
-    "skills": ["skills", "technical skills", "technologies", "tools"],
-    "projects": ["projects", "academic projects", "personal projects"],
+    "skills": ["skills", "technical skills", "technologies", "tools", "core competencies", "professional skills"],
+    "projects": [
+        "projects",
+        "academic projects",
+        "personal projects",
+        "software projects",
+        "clinical projects",
+        "audit engagements",
+        "recruitment drives",
+        "portfolio projects",
+        "published articles",
+        "hotel operations",
+        "legal cases",
+        "drug safety programs",
+    ],
     "education": ["education", "academics", "qualifications"],
-    "certifications": ["certifications", "certificates", "licenses", "courses"],
-    "experience": ["experience", "work experience", "internships", "employment"],
+    "certifications": ["certifications", "certificates", "licenses", "licensure", "courses"],
+    "experience": [
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment",
+        "employment history",
+        "internships",
+        "articleship",
+        "residency",
+        "clinical rotation",
+        "teaching experience",
+        "research experience",
+    ],
+    "achievements": ["achievements", "awards", "honors", "accomplishments"],
+    "languages": ["languages", "spoken languages", "language proficiency"],
 }
 
-CONFIDENCE_LOW_MESSAGE = "We couldn't confidently detect this field."
+CONFIDENCE_LOW_MESSAGE = "Not Found in Resume"
 
 
 @dataclass
@@ -166,6 +193,8 @@ class ResumeParseResult:
     education: list[str] = field(default_factory=list)
     certifications: list[str] = field(default_factory=list)
     experience: list[str] = field(default_factory=list)
+    achievements: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
     name: str = ""
     email: str = ""
     phone: str = ""
@@ -211,6 +240,8 @@ class ResumeParseResult:
             "projects": "\n".join(format_project(project) for project in self.structured_projects) or "\n".join(self.projects),
             "certifications": "\n".join(format_certification(cert) for cert in self.structured_certifications) or "\n".join(self.certifications),
             "internships": "\n".join(format_experience(exp) for exp in self.structured_experience) or "\n".join(self.experience),
+            "languages": ", ".join(self.languages),
+            "achievements": "\n".join(self.achievements),
         }
 
 
@@ -227,7 +258,9 @@ def extract_resume_text(uploaded_file: Any) -> str:
             return extract_docx_text(temp_path)
         if suffix in {".jpg", ".jpeg", ".png"}:
             return extract_image_text(temp_path)
-        raise RuntimeError("Unsupported resume format. Upload PDF, DOCX, JPG, JPEG, or PNG.")
+        if suffix in {".txt", ".text"}:
+            return Path(temp_path).read_text(encoding="utf-8", errors="ignore").strip()
+        raise RuntimeError("Unsupported resume format. Upload PDF, DOCX, TXT, JPG, JPEG, or PNG.")
     finally:
         Path(temp_path).unlink(missing_ok=True)
 
@@ -240,7 +273,28 @@ def extract_pdf_text(path: str) -> str:
 
     with fitz.open(path) as document:
         pages = [page.get_text("text") for page in document]
-    return "\n".join(pages).strip()
+        extracted = "\n".join(pages).strip()
+        if extracted:
+            return extracted
+        return extract_pdf_text_with_ocr(document)
+
+
+def extract_pdf_text_with_ocr(document: Any) -> str:
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError as exc:
+        raise RuntimeError("No text could be extracted from this resume. OCR fallback requires pytesseract and Pillow.") from exc
+
+    texts = []
+    for page in document:
+        pixmap = page.get_pixmap(matrix=__import__("fitz").Matrix(2, 2), alpha=False)
+        image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+        texts.append(pytesseract.image_to_string(image))
+    extracted = "\n".join(texts).strip()
+    if not extracted:
+        raise RuntimeError("No text could be extracted from this resume.")
+    return extracted
 
 
 def extract_docx_text(path: str) -> str:
@@ -288,10 +342,12 @@ def parse_resume_text(text: str, careers: dict[str, dict[str, Any]]) -> ResumePa
     result = ResumeParseResult(
         text=normalized_text,
         skills=detect_skills(normalized_text, skill_bank),
-        projects=detect_section_items(sections.get("projects", "")),
-        education=detect_section_items(sections.get("education", "")),
-        certifications=detect_section_items(sections.get("certifications", "")),
-        experience=detect_section_items(sections.get("experience", "")),
+        projects=detect_section_items(sections.get("projects", "")) or detect_labeled_items(normalized_text, "projects"),
+        education=detect_section_items(sections.get("education", "")) or detect_labeled_items(normalized_text, "education"),
+        certifications=detect_section_items(sections.get("certifications", "")) or detect_labeled_items(normalized_text, "certifications"),
+        experience=detect_section_items(sections.get("experience", "")) or detect_labeled_items(normalized_text, "experience"),
+        achievements=detect_section_items(sections.get("achievements", "")) or detect_labeled_items(normalized_text, "achievements"),
+        languages=detect_section_items(sections.get("languages", "")) or detect_labeled_items(normalized_text, "languages"),
         name=detect_name(normalized_text),
         email=detect_email(normalized_text),
         phone=detect_phone(normalized_text),
@@ -303,9 +359,9 @@ def parse_resume_text(text: str, careers: dict[str, dict[str, Any]]) -> ResumePa
         gpa=detect_gpa(normalized_text),
     )
     result.skill_categories = categorize_skills(result.skills)
-    result.structured_projects = parse_projects(sections.get("projects", ""))
-    result.structured_experience = parse_experience(sections.get("experience", ""))
-    result.structured_certifications = parse_certifications(sections.get("certifications", ""))
+    result.structured_projects = parse_projects(sections.get("projects", "")) or parse_projects("\n".join(result.projects))
+    result.structured_experience = parse_experience(sections.get("experience", "")) or parse_experience("\n".join(result.experience))
+    result.structured_certifications = parse_certifications(sections.get("certifications", "")) or parse_certifications("\n".join(result.certifications))
     result.degree = detect_degree(result.education, normalized_text)
     result.branch = detect_branch(result.education, normalized_text)
     result.university = detect_university(result.education, normalized_text)
@@ -415,10 +471,31 @@ def match_known_role(text: str, role_names: list[str]) -> str:
 def detect_skills(text: str, skill_bank: list[str]) -> list[str]:
     found = []
     for skill in skill_bank:
-        pattern = r"(?<![a-zA-Z0-9+#.])" + re.escape(skill) + r"(?![a-zA-Z0-9+#.])"
-        if re.search(pattern, text, flags=re.IGNORECASE):
+        variants = semantic_skill_variants(skill)
+        if any(re.search(r"(?<![a-zA-Z0-9+#.])" + re.escape(variant) + r"(?![a-zA-Z0-9+#.])", text, flags=re.IGNORECASE) for variant in variants):
             found.append(skill)
     return sorted(set(found), key=str.casefold)
+
+
+def semantic_skill_variants(skill: str) -> set[str]:
+    variants = {skill}
+    normalized = skill.casefold()
+    equivalents = {
+        "construction supervision": {"site supervision", "site execution"},
+        "financial reporting": {"financial statements", "financial statement analysis"},
+        "autocad": {"autocad civil", "auto cad"},
+        "python": {"python programming"},
+        "communication": {"communication skills", "verbal communication"},
+        "patient care": {"patient handling", "clinical care"},
+        "recruitment": {"talent acquisition", "sourcing"},
+        "rest apis": {"rest api", "api development"},
+        "machine learning": {"ml", "predictive modeling"},
+        "legal research": {"case law research"},
+    }
+    for canonical, values in equivalents.items():
+        if normalized == canonical:
+            variants.update(values)
+    return variants
 
 
 def categorize_skills(skills: list[str]) -> dict[str, list[str]]:
@@ -469,6 +546,19 @@ def detect_section_items(section_text: str, limit: int = 8) -> list[str]:
         cleaned = re.sub(r"^[\-*•\d.)\s]+", "", line).strip()
         if 4 <= len(cleaned) <= 140 and not is_section_heading(cleaned):
             items.append(cleaned)
+    return dedupe_preserve_order(items)[:limit]
+
+
+def detect_labeled_items(text: str, section: str, limit: int = 8) -> list[str]:
+    aliases = SECTION_ALIASES.get(section, [])
+    items = []
+    for line in text.splitlines():
+        for alias in aliases:
+            match = re.match(rf"\s*{re.escape(alias)}\s*[:\-]\s*(.+)$", line, flags=re.IGNORECASE)
+            if match:
+                value = match.group(1).strip()
+                if value:
+                    items.extend([part.strip() for part in re.split(r"\s*[|;]\s*", value) if part.strip()])
     return dedupe_preserve_order(items)[:limit]
 
 

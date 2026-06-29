@@ -19,6 +19,16 @@ DOMAIN_KEYWORDS = {
         "robotics",
         "cad",
         "solidworks",
+        "renewable energy",
+        "solar energy",
+        "wind energy",
+        "grid operations",
+        "pilot",
+        "commercial pilot",
+        "flight operations",
+        "aviation safety",
+        "marine engineer",
+        "maritime safety",
     ],
     "Technology": [
         "computer science",
@@ -79,6 +89,10 @@ DOMAIN_KEYWORDS = {
         "mbbs",
         "nursing",
         "pharmacy",
+        "pharmacist",
+        "pharmaceutical",
+        "formulation",
+        "drug safety",
         "physiotherapy",
         "public health",
         "clinical",
@@ -117,10 +131,10 @@ DOMAIN_KEYWORDS = {
         "fashion",
         "portfolio",
     ],
-    "Hospitality": ["hotel management", "hospitality", "front office", "food and beverage", "tourism", "guest relations"],
-    "Architecture": ["architecture", "urban planning", "autocad", "revit", "building design", "model making"],
+    "Hospitality": ["hotel management", "hospitality", "front office", "food and beverage", "tourism", "guest relations", "chef", "kitchen operations", "food safety", "menu planning"],
+    "Architecture": ["architecture", "urban planning", "autocad", "revit", "building design", "model making", "interior designer", "interior design", "space planning", "lighting design"],
     "Agriculture": ["agriculture", "agronomy", "soil", "crop", "farm", "food technology", "sustainability"],
-    "Government": ["upsc", "ssc", "government", "public administration", "policy", "civil services", "defence"],
+    "Government": ["upsc", "ssc", "government", "public administration", "policy", "civil services", "defence", "police officer", "law enforcement", "public safety", "citizen services"],
     "Entrepreneurship": ["startup", "founder", "business model", "pitch", "fundraising", "freelance", "entrepreneur"],
 }
 
@@ -1228,6 +1242,7 @@ def get_career_knowledge(career_name: str, fallback: dict[str, Any] | None = Non
         "required_skills": fallback.get("required_skills", SKILLS_BY_DOMAIN.get(domain, [])[:6]),
         "technical_skills": fallback.get("technical_skills", SKILLS_BY_DOMAIN.get(domain, [])[:5]),
         "soft_skills": fallback.get("soft_skills", ["Communication", "Problem Solving", "Professional Judgment"]),
+        "tools": fallback.get("tools", DOMAIN_PROFILES.get(domain, {}).get("tools", SKILLS_BY_DOMAIN.get(domain, [])[:4])),
         "degree_requirements": fallback.get("degree_requirements", ["Relevant degree or portfolio proof"]),
         "preferred_certifications": fallback.get("recommended_certifications", fallback.get("preferred_certifications", [])),
         "target_projects": fallback.get("target_projects", [f"{career_name} portfolio project"]),
@@ -1256,15 +1271,15 @@ def enrich_career(name: str, career: dict[str, Any]) -> dict[str, Any]:
         "domain": domain,
         "description": career.get("description", ""),
         "required_skills": career.get("required_skills", []),
-        "technical_skills": career.get("technical_skills", []),
+        "technical_skills": career.get("technical_skills") or domain_profile.get("technical_skills", SKILLS_BY_DOMAIN.get(domain, []))[:6],
         "soft_skills": career.get("soft_skills", []),
-        "tools": career.get("tools", domain_profile.get("tools", [])),
+        "tools": career.get("tools") or domain_profile.get("tools") or SKILLS_BY_DOMAIN.get(domain, [])[:4],
         "software": career.get("software", domain_profile.get("software", [])),
         "frameworks": career.get("frameworks", domain_profile.get("frameworks", [])),
         "degree_requirements": career.get("degree_requirements", []),
         "preferred_certifications": career.get("preferred_certifications", career.get("recommended_certifications", [])),
         "recommended_certifications": career.get("preferred_certifications", career.get("recommended_certifications", [])),
-        "certifications": career.get("certifications", career.get("preferred_certifications", domain_profile.get("certifications", []))),
+        "certifications": career.get("certifications") or career.get("preferred_certifications") or domain_profile.get("certifications") or [f"{name} professional certificate"],
         "experience_level": career.get("experience_level", "Entry to mid-level with portfolio proof"),
         "portfolio_requirements": career.get("portfolio_requirements", career.get("target_projects", [])),
         "target_projects": career.get("target_projects", []),
@@ -1285,6 +1300,16 @@ def enrich_career(name: str, career: dict[str, Any]) -> dict[str, Any]:
         "most_demanded_countries": career.get("most_demanded_countries", ["India", "USA", "Germany", "Canada", "Australia"]),
         "most_demanded_cities": career.get("most_demanded_cities", demanded_cities_for_domain(domain)),
         "career_path": career.get("career_path", career_path_for(name, domain)),
+        "roadmap": career.get("roadmap", roadmap_for(name, domain, career.get("required_skills", []))),
+        "ats_keywords": career.get("ats_keywords", ats_keywords_for(name, domain, career.get("required_skills", []))),
+        "resume_keywords": career.get("resume_keywords", resume_keywords_for(name, domain, career.get("required_skills", []))),
+        "transition_paths": career.get("transition_paths", transition_paths_for(name, domain)),
+        "industry_insights": career.get("industry_insights", industry_insights_for(name, domain)),
+        "daily_responsibilities": career.get("daily_responsibilities", daily_responsibilities_for(name, domain)),
+        "kpis": career.get("kpis", kpis_for(domain)),
+        "licensing_requirements": career.get("licensing_requirements", licensing_requirements_for(name, domain)),
+        "work_environment": career.get("work_environment", work_environment_for(domain)),
+        "expected_growth": career.get("expected_growth", career.get("future_growth", "Medium to High")),
         "internship_recommendations": career.get("internship_recommendations", [f"{name} internship", f"{domain} trainee role"]),
         "country_specific_information": career.get("country_specific_information", {}),
         "learning_resources": {**BASE_RESOURCES, **domain_resources, **resources},
@@ -1306,8 +1331,8 @@ def generate_profession_profile(name: str, domain: str) -> dict[str, Any]:
         "software": profile.get("software", []),
         "frameworks": profile.get("frameworks", []),
         "degree_requirements": degree_requirements_for(name, domain),
-        "preferred_certifications": profile.get("certifications", []),
-        "certifications": profile.get("certifications", []),
+        "preferred_certifications": profile.get("certifications", []) or [f"{name} professional certificate"],
+        "certifications": profile.get("certifications", []) or [f"{name} professional certificate"],
         "target_projects": portfolio_for(name, domain, profile),
         "portfolio_requirements": portfolio_for(name, domain, profile),
         "hiring_companies": profile.get("companies", []),
@@ -1320,6 +1345,19 @@ def generate_profession_profile(name: str, domain: str) -> dict[str, Any]:
         "startup_opportunities": profile.get("startup", startup_level_for_domain(domain)),
         "ai_impact": profile.get("ai_impact", ""),
         "interview_pattern": profile.get("interview", []),
+        "career_path": career_path_for(name, domain),
+        "roadmap": roadmap_for(name, domain, required),
+        "ats_keywords": ats_keywords_for(name, domain, required),
+        "resume_keywords": resume_keywords_for(name, domain, required),
+        "transition_paths": transition_paths_for(name, domain),
+        "industry_insights": industry_insights_for(name, domain),
+        "daily_responsibilities": daily_responsibilities_for(name, domain),
+        "kpis": kpis_for(domain),
+        "licensing_requirements": licensing_requirements_for(name, domain),
+        "work_environment": work_environment_for(domain),
+        "expected_growth": growth_for_domain(domain),
+        "most_demanded_cities": demanded_cities_for_domain(domain),
+        "most_demanded_countries": ["India", "USA", "Germany", "Canada", "Australia"],
         "internship_recommendations": [f"{name} internship", f"{domain} trainee role", f"{name} shadowing project"],
         "learning_resources": {
             "books": profile.get("books", []),
@@ -1410,6 +1448,161 @@ def portfolio_for(name: str, domain: str, profile: dict[str, Any]) -> list[str]:
     return [f"{name} case study", f"{domain} portfolio artifact", "measurable outcome report"]
 
 
+def ats_keywords_for(name: str, domain: str, required: list[str]) -> list[str]:
+    """Return ATS terms scoped to the role domain."""
+    domain_terms = {
+        "Healthcare": ["clinical documentation", "patient safety", "care plan", "hospital protocols"],
+        "Finance": ["financial reporting", "audit", "taxation", "compliance", "variance analysis"],
+        "Law": ["legal research", "contract drafting", "case analysis", "compliance"],
+        "Education": ["lesson planning", "assessment", "curriculum", "student outcomes"],
+        "Marketing": ["campaign performance", "brand strategy", "SEO", "content planning"],
+        "Creative": ["portfolio", "visual design", "client brief", "creative direction"],
+        "Architecture": ["BIM", "Revit", "building codes", "design development"],
+        "Hospitality": ["guest experience", "service recovery", "hotel operations", "food safety"],
+        "Agriculture": ["crop advisory", "soil science", "field operations", "sustainability"],
+        "Government": ["public administration", "policy implementation", "citizen services", "governance"],
+        "Science": ["research methods", "laboratory protocols", "publication", "data analysis"],
+        "Business": ["stakeholder management", "operations", "process improvement", "CRM"],
+        "Engineering": ["project documentation", "quality control", "safety", "technical drawings"],
+        "Technology": ["software architecture", "testing", "deployment", "version control"],
+    }
+    return dedupe([name, domain, *required[:6], *domain_terms.get(domain, [])])[:12]
+
+
+def resume_keywords_for(name: str, domain: str, required: list[str]) -> list[str]:
+    """Return resume terms recruiters expect for a specific career."""
+    return dedupe([*ats_keywords_for(name, domain, required), "measurable outcomes", "cross-functional collaboration"])[:14]
+
+
+def transition_paths_for(name: str, domain: str) -> list[str]:
+    paths = {
+        "Healthcare": ["Clinical specialization", "Healthcare operations", "Quality and compliance leadership"],
+        "Finance": ["Audit and reporting", "FP&A / controllership", "Finance leadership"],
+        "Law": ["Practice specialization", "In-house counsel", "Compliance leadership"],
+        "Education": ["Senior teaching", "Academic coordination", "Institution leadership"],
+        "Marketing": ["Performance marketing", "Brand management", "Growth leadership"],
+        "Creative": ["Specialist portfolio track", "Art direction", "Creative leadership"],
+        "Architecture": ["Project architect", "Design manager", "Principal architect"],
+        "Hospitality": ["Department operations", "Revenue/service management", "General management"],
+        "Agriculture": ["Field advisory", "Agri operations", "Sustainability programs"],
+        "Government": ["Program administration", "Policy leadership", "Department management"],
+        "Science": ["Research associate", "Senior scientist", "Principal investigator"],
+        "Business": ["Operations specialist", "Manager", "Business unit leadership"],
+        "Engineering": ["Senior engineer", "Project manager", "Engineering leadership"],
+        "Technology": ["Senior contributor", "Technical lead", "Engineering leadership"],
+    }
+    return paths.get(domain, [name, f"Senior {name}", f"{domain} leadership"])
+
+
+def industry_insights_for(name: str, domain: str) -> list[str]:
+    insights = {
+        "Healthcare": "Demand is driven by patient volumes, hospital expansion, specialization, and care quality.",
+        "Finance": "Demand is shaped by compliance, reporting quality, risk control, and business expansion.",
+        "Law": "Demand depends on regulation, contracts, disputes, privacy, and sector specialization.",
+        "Education": "Education reforms, online learning, and outcome-focused teaching increase demand.",
+        "Marketing": "Digital channels, brand differentiation, and retention analytics shape hiring.",
+        "Creative": "Portfolio quality, originality, and measurable client outcomes drive opportunities.",
+        "Architecture": "Urban growth, BIM adoption, sustainability, and construction quality drive demand.",
+        "Hospitality": "Tourism, premium service, events, and guest experience sustain demand.",
+        "Agriculture": "Food security, supply chains, sustainability, and precision farming shape demand.",
+        "Government": "Public services, infrastructure, regulation, and social programs sustain demand.",
+        "Science": "Research funding, clinical studies, sustainability, and applied R&D shape demand.",
+        "Business": "Efficiency, customer growth, and operational excellence drive hiring.",
+        "Engineering": "Infrastructure, manufacturing, energy systems, and safety standards drive demand.",
+        "Technology": "Digital products, cybersecurity, automation, and cloud modernization drive demand.",
+    }
+    return [insights.get(domain, f"{name} demand depends on role-specific expertise and measurable outcomes.")]
+
+
+def daily_responsibilities_for(name: str, domain: str) -> list[str]:
+    responsibilities = {
+        "Healthcare": ["Assess cases or patients", "Document outcomes", "Coordinate with clinical teams", "Follow safety protocols"],
+        "Finance": ["Review reports", "Analyze variances", "Maintain controls", "Prepare stakeholder summaries"],
+        "Law": ["Research law", "Draft documents", "Review cases", "Advise stakeholders"],
+        "Education": ["Plan lessons", "Teach learners", "Assess progress", "Support student development"],
+        "Marketing": ["Plan campaigns", "Track performance", "Create content briefs", "Optimize channels"],
+        "Creative": ["Interpret briefs", "Create concepts", "Iterate designs", "Present work"],
+        "Architecture": ["Develop drawings", "Coordinate models", "Review codes", "Present design options"],
+        "Hospitality": ["Manage service delivery", "Resolve guest issues", "Coordinate teams", "Track operations"],
+        "Agriculture": ["Inspect field conditions", "Advise stakeholders", "Track crop or supply metrics", "Document findings"],
+        "Government": ["Process public work", "Coordinate programs", "Review compliance", "Report outcomes"],
+        "Science": ["Run research tasks", "Analyze results", "Document methods", "Review literature"],
+        "Business": ["Coordinate stakeholders", "Track metrics", "Improve processes", "Prepare reports"],
+        "Engineering": ["Review technical work", "Coordinate execution", "Maintain safety", "Document progress"],
+        "Technology": ["Design solutions", "Build or review systems", "Test changes", "Document decisions"],
+    }
+    return responsibilities.get(domain, [f"Execute {name} responsibilities", "Coordinate stakeholders", "Track measurable outcomes"])
+
+
+def kpis_for(domain: str) -> list[str]:
+    return {
+        "Healthcare": ["patient safety", "documentation accuracy", "care turnaround", "protocol compliance"],
+        "Finance": ["report accuracy", "deadline adherence", "control quality", "variance resolution"],
+        "Law": ["case quality", "drafting accuracy", "turnaround time", "compliance outcomes"],
+        "Education": ["student progress", "assessment quality", "class engagement", "curriculum completion"],
+        "Marketing": ["conversion rate", "CAC", "engagement", "campaign ROI"],
+        "Creative": ["portfolio quality", "revision cycles", "brand consistency", "client satisfaction"],
+        "Architecture": ["drawing quality", "code compliance", "coordination accuracy", "design milestones"],
+        "Hospitality": ["guest satisfaction", "service recovery", "occupancy/revenue", "SOP compliance"],
+        "Agriculture": ["yield improvement", "field coverage", "supply reliability", "sustainability metrics"],
+        "Government": ["service delivery time", "policy compliance", "citizen satisfaction", "program outcomes"],
+        "Science": ["research quality", "method accuracy", "publication output", "reproducibility"],
+        "Business": ["process efficiency", "stakeholder satisfaction", "cost savings", "delivery timelines"],
+        "Engineering": ["quality defects", "safety compliance", "schedule adherence", "technical accuracy"],
+        "Technology": ["system reliability", "defect rate", "delivery velocity", "code quality"],
+    }.get(domain, ["quality", "timeliness", "stakeholder satisfaction", "measurable outcomes"])
+
+
+def licensing_requirements_for(name: str, domain: str) -> list[str]:
+    lowered = name.casefold()
+    if domain == "Healthcare":
+        if "doctor" in lowered or "medical" in lowered:
+            return ["Valid medical registration where required"]
+        if "nurse" in lowered:
+            return ["Nursing council registration where required"]
+        if "pharmac" in lowered:
+            return ["Pharmacy council registration where required"]
+        return ["Role-specific healthcare license where required"]
+    if domain == "Law":
+        return ["Bar council or jurisdiction eligibility where required"]
+    if domain == "Architecture":
+        return ["Architecture council registration where required"]
+    if "pilot" in lowered:
+        return ["Valid pilot license and medical fitness certification"]
+    if domain == "Education":
+        return ["Teaching certification where required"]
+    return ["No universal license; verify local regulations for this role"]
+
+
+def work_environment_for(domain: str) -> str:
+    return {
+        "Healthcare": "Hospitals, clinics, labs, pharmacies, or healthcare operations teams.",
+        "Finance": "Corporate finance teams, audit firms, banks, consultancies, or shared-service centers.",
+        "Law": "Law firms, courts, in-house legal teams, compliance teams, or public institutions.",
+        "Education": "Schools, universities, edtech teams, training centers, or research institutions.",
+        "Marketing": "Agencies, startups, consumer brands, SaaS teams, or media teams.",
+        "Creative": "Studios, agencies, product teams, media companies, or freelance environments.",
+        "Architecture": "Architecture studios, construction sites, planning firms, or real-estate teams.",
+        "Hospitality": "Hotels, restaurants, resorts, travel operations, or event venues.",
+        "Agriculture": "Field sites, agri-businesses, food companies, farms, or sustainability programs.",
+        "Government": "Public offices, field departments, policy teams, or public-sector agencies.",
+        "Science": "Labs, universities, R&D centers, field sites, or clinical research teams.",
+        "Business": "Corporate offices, operations floors, client sites, or hybrid business teams.",
+        "Engineering": "Plants, project sites, design offices, labs, or infrastructure teams.",
+        "Technology": "Product teams, engineering organizations, cloud environments, or remote teams.",
+    }.get(domain, "Role-specific professional environment.")
+
+
+def roadmap_for(name: str, domain: str, required: list[str]) -> list[str]:
+    focus = required[:3] or SKILLS_BY_DOMAIN.get(domain, [])[:3] or [name]
+    return [
+        f"Month 1: strengthen {focus[0]} fundamentals for {name}.",
+        f"Month 2: complete a {domain.lower()} proof artifact using {focus[min(1, len(focus)-1)]}.",
+        f"Month 3: document outcomes with role-specific resume keywords.",
+        f"Month 4: prepare interviews around {focus[min(2, len(focus)-1)]}.",
+    ]
+
+
 def career_path_for(name: str, domain: str) -> list[str]:
     """Generate a simple career progression ladder."""
     key = name.casefold()
@@ -1424,11 +1617,58 @@ def career_path_for(name: str, domain: str) -> list[str]:
             return ["Investment Analyst", "Senior Investment Analyst", "Portfolio Manager", "Investment Director", "Chief Investment Officer"]
         return ["Finance Analyst", "Senior Financial Analyst", "FP&A Manager", "Finance Manager", "Finance Controller", "Finance Director", "Chief Financial Officer"]
     if domain == "Technology" and "software" in key:
-        return ["Software Engineer", "Senior Software Engineer", "Tech Lead", "Engineering Manager", "Director of Engineering", "VP Engineering", "Chief Technology Officer"]
+        return ["Junior Software Engineer", "Software Engineer", "Senior Software Engineer", "Lead Software Engineer", "Engineering Manager", "Director of Engineering", "VP Engineering", "Chief Technology Officer"]
+    if domain == "Technology" and ("backend" in key or "frontend" in key or "full stack" in key):
+        specialty = "Backend Engineer" if "backend" in key else "Frontend Engineer" if "frontend" in key else "Full Stack Engineer"
+        return [f"Junior {specialty}", specialty, f"Senior {specialty}", f"Lead {specialty}", "Engineering Manager", "Director of Engineering", "Chief Technology Officer"]
+    if domain == "Technology" and ("security" in key or "cyber" in key or "soc" in key):
+        return ["SOC Analyst", "Cybersecurity Analyst", "Security Engineer", "Senior Security Engineer", "Security Architect", "Head of Security", "Chief Information Security Officer"]
+    if domain == "Technology" and ("cloud" in key or "devops" in key or "site reliability" in key):
+        return ["Cloud Engineer", "Senior Cloud Engineer", "DevOps Engineer", "Site Reliability Engineer", "Cloud Architect", "Platform Engineering Manager", "Head of Cloud"]
+    if domain == "Technology" and ("data" in key or "machine learning" in key or "ai " in key or key == "ai engineer"):
+        return ["Data Analyst", "Data Scientist", "Machine Learning Engineer", "AI Engineer", "Senior AI Engineer", "AI Architect", "Head of AI"]
+    if domain == "Healthcare":
+        if "nurse" in key:
+            return ["Staff Nurse", "Senior Nurse", "Charge Nurse", "Nursing Supervisor", "Nurse Manager", "Director of Nursing"]
+        if "pharmac" in key:
+            return ["Pharmacist", "Clinical Pharmacist", "Senior Pharmacist", "Pharmacy Manager", "Head of Pharmacy"]
+        if "doctor" in key or "medical officer" in key or "surgeon" in key or "dentist" in key:
+            return ["Medical Officer", "Resident Doctor", "Specialist Doctor", "Consultant Doctor", "Medical Director"]
+        return ["Healthcare Associate", name, f"Senior {name}", "Healthcare Manager", "Healthcare Operations Director"]
+    if domain == "Law":
+        return ["Legal Intern", "Legal Associate", "Senior Legal Associate", "Legal Counsel", "Legal Manager", "Partner", "General Counsel"]
+    if domain == "Architecture":
+        return ["Junior Architect", "Architect", "Project Architect", "Senior Architect", "Design Manager", "Principal Architect"]
+    if domain == "Engineering":
+        if "civil" in key or "construction" in key or "structural" in key:
+            return ["Site Engineer", "Civil Engineer", "Structural Engineer", "Construction Manager", "Project Manager", "Infrastructure Director"]
+        if "mechanical" in key or "manufacturing" in key or "production" in key:
+            return ["Graduate Engineer Trainee", "Mechanical Engineer", "Manufacturing Engineer", "Production Manager", "Plant Head", "Director of Engineering"]
+        if "electrical" in key or "power" in key:
+            return ["Electrical Engineer", "Senior Electrical Engineer", "Power Systems Engineer", "Project Manager", "Engineering Manager"]
+        return ["Graduate Engineer Trainee", name, f"Senior {name}", f"Lead {domain} Specialist", "Engineering Manager"]
     if domain == "Education":
         return ["Teacher", "Senior Teacher", "Academic Coordinator", "Principal", "Dean"]
     if domain == "Marketing":
         return ["Marketing Executive", "Marketing Manager", "Senior Marketing Manager", "Head of Marketing", "Chief Marketing Officer"]
+    if domain == "Business":
+        if "hr" in key or "recruit" in key or "talent" in key:
+            return ["HR Executive", "Recruiter", "HR Business Partner", "HR Manager", "Head of HR", "Chief Human Resources Officer"]
+        if "supply chain" in key or "logistics" in key:
+            return ["Logistics Coordinator", "Supply Chain Analyst", "Supply Chain Manager", "Operations Manager", "Director of Supply Chain"]
+        if "sales" in key:
+            return ["Sales Executive", "Account Manager", "Sales Manager", "Regional Sales Manager", "Sales Director"]
+        return ["Business Analyst", "Senior Business Analyst", "Product Manager", "Program Manager", "Business Unit Head"]
+    if domain == "Creative":
+        return ["Junior Designer", name, f"Senior {name}", "Art Director", "Creative Director"]
+    if domain == "Hospitality":
+        return ["Trainee", name, f"Senior {name}", "Operations Manager", "General Manager"]
+    if domain == "Agriculture":
+        return ["Field Officer", name, f"Senior {name}", "Agri Operations Manager", "Agriculture Program Director"]
+    if domain == "Government":
+        return ["Officer Trainee", name, f"Senior {name}", "Department Manager", "Director"]
+    if domain == "Science":
+        return ["Research Assistant", "Research Associate", "Research Scientist", "Senior Research Scientist", "Principal Scientist"]
     return [f"Entry-level {name}", name, f"Senior {name}", f"Lead {domain} Specialist"]
 
 
@@ -1596,6 +1836,10 @@ def recommend_careers_for_profile(
     years = infer_years_experience(profile, resume)
     current_domain = getattr(resume, "detected_domain", "") if resume else ""
     current_path = career_path_for(designation, current_domain) if designation and current_domain else []
+    goal_name = str(getattr(profile, "career_goal", "") or "")
+    goal_domain = str(careers.get(goal_name, {}).get("domain", "")) if goal_name else ""
+    primary_domain = current_domain if current_domain and current_domain != "General" else goal_domain
+    explicit_switch = bool(goal_domain and primary_domain and goal_domain != primary_domain)
     education = " ".join([getattr(profile, "degree", ""), getattr(profile, "branch", "")]).casefold()
     skills = [skill.casefold() for skill in getattr(profile, "skills", [])]
     certifications = [cert.casefold() for cert in getattr(profile, "certifications", [])]
@@ -1606,6 +1850,8 @@ def recommend_careers_for_profile(
         degrees = " ".join(career.get("degree_requirements", [])).casefold()
         cert_targets = [cert.casefold() for cert in career.get("preferred_certifications", career.get("certifications", []))]
         career_domain = career.get("domain", "")
+        if primary_domain and career_domain != primary_domain and not (explicit_switch and career_domain == goal_domain):
+            continue
 
         experience_score = experience_alignment_score(name, years)
         designation_score = text_similarity_score(designation, name + " " + " ".join(career.get("career_path", [])))
@@ -1634,9 +1880,31 @@ def recommend_careers_for_profile(
             if current_index >= 0 and role_index <= current_index:
                 total -= 10
             else:
-                total += 24
+                total += 34
+                if current_index >= 0 and role_index == current_index + 1:
+                    total += 30
+        if primary_domain:
+            if career_domain == primary_domain or (explicit_switch and career_domain == goal_domain):
+                total += 16
+            else:
+                total -= 65
         if detected_domain and career_domain == detected_domain:
-            total += 8
+            total += 12
+        if goal_name:
+            goal_key = goal_name.casefold()
+            name_key = name.casefold()
+            if name_key == goal_key:
+                total += 18
+            elif goal_key in name_key or name_key in goal_key:
+                total += 10
+        if designation:
+            designation_key = strip_seniority(designation).casefold()
+            if designation_key and designation_key in name.casefold():
+                total += 26
+            if "ux" in designation_key and not any(term in name.casefold() for term in ["ux", "ui ux", "product designer"]):
+                total -= 24
+            if "devops" in designation_key and career_domain != "Technology":
+                total -= 30
         if total > 20:
             reasons = []
             if designation_score:
@@ -1669,7 +1937,17 @@ def recommend_careers_for_profile(
                     matched_signals=reasons,
                 )
             )
-    return sorted(scored, key=lambda item: item.fit_score, reverse=True)[:limit]
+    current_index = path_names.index(designation.casefold()) if designation and designation.casefold() in path_names else -1
+
+    def recommendation_sort_key(item: CareerRecommendation) -> tuple[int, int, int, str]:
+        name_key = item.career.casefold()
+        if current_index >= 0 and name_key in path_names:
+            role_index = path_names.index(name_key)
+            if role_index > current_index:
+                return (1, item.fit_score, -role_index, item.career.casefold())
+        return (0, item.fit_score, -seniority_rank(item.career), item.career.casefold())
+
+    return sorted(scored, key=recommendation_sort_key, reverse=True)[:limit]
 
 
 def infer_current_designation(profile: Any, resume: Any | None) -> str:

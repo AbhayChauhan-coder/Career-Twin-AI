@@ -41,6 +41,7 @@ from services.resume_matcher import (
     ResumeMatchAnalysis,
     analyze_resume_match,
     compare_resume_to_job_description,
+    is_github_relevant,
 )
 from services.ai_mentor import answer_mentor_question, build_mentor_context
 from services.career_knowledge import (
@@ -73,10 +74,41 @@ st.markdown(
     div[data-testid="stMetric"] { min-height: 76px; }
     div[data-testid="stHorizontalBlock"] { gap: 0.85rem; }
     .block-container { padding-bottom: 3rem; }
+    .career-section-anchor { scroll-margin-top: 92px; height: 1px; }
+    .dashboard-section-nav {
+        position: sticky;
+        top: 0.25rem;
+        z-index: 999;
+        display: flex;
+        gap: 0.45rem;
+        overflow-x: auto;
+        padding: 0.55rem;
+        margin: 0.5rem 0 1rem;
+        border: 1px solid rgba(128,128,128,.25);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--background-color) 92%, transparent);
+        backdrop-filter: blur(12px);
+    }
+    .dashboard-section-nav a {
+        white-space: nowrap;
+        text-decoration: none;
+        border: 1px solid rgba(128,128,128,.25);
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        color: inherit;
+        font-size: 0.86rem;
+    }
+    .dashboard-section-nav a:hover,
+    .dashboard-section-nav a:focus {
+        border-color: #3b82f6;
+        background: rgba(59, 130, 246, .12);
+    }
+    html { scroll-behavior: smooth; }
     @media (max-width: 760px) {
         div[data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; }
         div[data-testid="stMetric"] { min-height: auto; }
         .stButton button, .stDownloadButton button, .stLinkButton a { width: 100%; }
+        .dashboard-section-nav { top: 0; border-radius: 0; margin-left: -0.25rem; margin-right: -0.25rem; }
     }
     </style>
     """,
@@ -91,37 +123,81 @@ def render_metric(label: str, value: str, note: str = "") -> None:
             st.caption(note)
 
 
-def render_about_developer() -> None:
-    st.subheader("About the Developer")
-    with st.container(border=True):
-        cols = st.columns([1.2, 1])
-        with cols[0]:
-            st.markdown("**Developer:** Abhay Chauhan")
-            st.markdown("**Role:** AI Engineer")
-            st.markdown("**Project:** Career Twin AI")
-            st.caption("A production-focused AI career intelligence platform for resume analysis, career matching, roadmap generation, and digital twin simulation.")
-        with cols[1]:
-            st.markdown(
-                """
-                <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                    <a href="https://github.com/AbhayChauhan-coder" target="_blank"
-                       style="display:flex; align-items:center; gap:8px; border:1px solid rgba(128,128,128,.35); border-radius:8px; padding:10px 12px; text-decoration:none;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 .1.8 2.1 3.3 1.5.1-.7.4-1.2.7-1.5-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.1 5.1 18 5.4 18 5.4c.6 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.4 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/>
-                        </svg>
-                        <span>GitHub</span>
-                    </a>
-                    <a href="https://www.linkedin.com/in/abhay-chauhan-6b06a837a" target="_blank"
-                       style="display:flex; align-items:center; gap:8px; border:1px solid rgba(128,128,128,.35); border-radius:8px; padding:10px 12px; text-decoration:none;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M20.4 20.4h-3.6v-5.6c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9v5.7H9.3V9h3.4v1.6h.1c.5-.9 1.6-1.8 3.3-1.8 3.6 0 4.3 2.4 4.3 5.4v6.2ZM5.2 7.4a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2Zm1.8 13H3.4V9H7v11.4ZM22.2 0H1.8C.8 0 0 .8 0 1.8v20.4c0 1 .8 1.8 1.8 1.8h20.4c1 0 1.8-.8 1.8-1.8V1.8c0-1-.8-1.8-1.8-1.8Z"/>
-                        </svg>
-                        <span>LinkedIn</span>
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+def section_anchor(section_id: str) -> None:
+    st.markdown(f'<div id="{section_id}" class="career-section-anchor"></div>', unsafe_allow_html=True)
+
+
+def render_dashboard_nav(has_resume: bool, has_github: bool) -> None:
+    sections = [
+        ("overview", "Overview"),
+        ("career-twin", "Career Twin"),
+        ("country-intelligence", "Country Intelligence"),
+        ("career-intelligence", "Career Intelligence"),
+        ("skill-gap", "Skill Gap"),
+        ("career-match", "Career Match"),
+        ("probability", "Final Readiness"),
+        ("future-simulation", "Future Simulation"),
+        ("roadmap", "Roadmap"),
+        ("action-plan", "Action Plan"),
+        ("feedback", "Feedback"),
+    ]
+    if has_resume:
+        sections.insert(3, ("resume-analysis", "Resume Analysis"))
+        sections.insert(4, ("resume-match", "Resume Match"))
+        sections.insert(5, ("career-recommendations", "Recommendations"))
+    if has_github:
+        sections.insert(6 if has_resume else 3, ("github-analysis", "GitHub Analysis"))
+    links = "".join(f'<a href="#{section_id}">{label}</a>' for section_id, label in sections)
+    st.markdown(f'<nav class="dashboard-section-nav" aria-label="Dashboard sections">{links}</nav>', unsafe_allow_html=True)
+
+
+def render_feedback_contact() -> None:
+    st.subheader("Feedback & Contact")
+    st.caption("Share bugs, ideas, data corrections, or analysis issues directly with the developer.")
+
+    feedback_type = st.selectbox(
+        "Feedback Type",
+        [
+            "Bug Report",
+            "Feature Request",
+            "General Feedback",
+            "Career Data Issue",
+            "Resume Parsing Issue",
+            "GitHub Analysis Issue",
+        ],
+        key="feedback_type",
+    )
+    rating = st.slider("Rating", min_value=1, max_value=5, value=5, key="feedback_rating")
+    subject = st.text_input("Subject", key="feedback_subject", placeholder="Short summary")
+    message = st.text_area("Message", key="feedback_message", placeholder="Describe what happened or what you would like improved.", height=140)
+
+    upload_cols = st.columns(2)
+    with upload_cols[0]:
+        st.file_uploader("Screenshot upload", type=["png", "jpg", "jpeg"], key="feedback_screenshot")
+    with upload_cols[1]:
+        st.file_uploader("Resume upload", type=["pdf", "docx", "txt", "jpg", "jpeg", "png"], key="feedback_resume")
+
+    body_lines = [
+        f"Feedback Type: {feedback_type}",
+        f"Rating: {rating}/5",
+        "",
+        "Message:",
+        message or "",
+    ]
+    mail_subject = subject or f"Career Twin AI - {feedback_type}"
+    mailto = (
+        "mailto:abhay772008@gmail.com"
+        f"?subject={quote_mailto(mail_subject)}"
+        f"&body={quote_mailto(chr(10).join(body_lines))}"
+    )
+    st.link_button("Send Email", mailto, use_container_width=True)
+    st.caption("Developer contact: [abhay772008@gmail.com](mailto:abhay772008@gmail.com)")
+
+
+def quote_mailto(value: str) -> str:
+    from urllib.parse import quote
+
+    return quote(value, safe="")
 
 
 def render_footer() -> None:
@@ -181,6 +257,7 @@ def build_dashboard_report(
     readiness: dict[str, object],
     probability: int,
     country_intelligence: CountryCareerIntelligence,
+    career_knowledge: dict[str, object],
     resume: ResumeParseResult | None,
     github_analysis: GitHubAnalysis | None,
     resume_match: ResumeMatchAnalysis | None,
@@ -205,12 +282,14 @@ def build_dashboard_report(
         },
         "readiness": readiness,
         "success_probability": probability,
+        "career_intelligence": career_knowledge,
         "country_intelligence": country_intelligence.__dict__,
         "resume": {
             "status": resume.extraction_status,
             "detected_domain": resume.detected_domain,
             "current_designation": resume.current_designation,
             "strength_score": resume.strength_score,
+            "ats_readiness": resume.ats_readiness_score,
             "skills": resume.skills,
         } if resume else None,
         "github": {
@@ -256,6 +335,17 @@ def build_pdf_report(report: dict[str, object]) -> bytes:
     write_line(f"Readiness Score: {report['readiness']['score']}%", 11)
     write_line(f"Success Probability: {report['success_probability']}%", 11)
     write_line("")
+    draw_score_bars(
+        page,
+        48,
+        y,
+        {
+            "Readiness": int(report["readiness"]["score"]),
+            "Success": int(report["success_probability"]),
+            "ATS": int((report.get("resume") or {}).get("ats_readiness", report["readiness"].get("score", 0)) or 0),
+        },
+    )
+    y += 86
     write_line("Matched Skills", 13, True)
     for item in report["readiness"].get("matched_skills", [])[:12]:
         write_line(f"- {item}")
@@ -266,6 +356,15 @@ def build_pdf_report(report: dict[str, object]) -> bytes:
     country = report["country_intelligence"]
     for key in ["demand_level", "entry_salary", "mid_level_salary", "senior_salary", "visa_difficulty", "market_growth"]:
         write_line(f"{key.replace('_', ' ').title()}: {country.get(key, '')}")
+    career = report.get("career_intelligence", {})
+    if career:
+        write_line("Career Intelligence", 13, True)
+        for key in ["daily_responsibilities", "kpis", "ats_keywords", "licensing_requirements"]:
+            values = career.get(key, [])
+            if isinstance(values, list):
+                write_line(f"{key.replace('_', ' ').title()}: {', '.join(values[:4])}")
+            elif values:
+                write_line(f"{key.replace('_', ' ').title()}: {values}")
     if report.get("github"):
         github = report["github"]
         write_line("GitHub Analysis", 13, True)
@@ -285,6 +384,19 @@ def build_pdf_report(report: dict[str, object]) -> bytes:
     pdf = doc.tobytes()
     doc.close()
     return pdf
+
+
+def draw_score_bars(page: object, x: int, y: int, scores: dict[str, int]) -> None:
+    import fitz
+
+    page.insert_text((x, y), "Score Snapshot", fontsize=13, fontname="helv")
+    y += 16
+    for label, score in scores.items():
+        bounded = max(0, min(int(score), 100))
+        page.insert_text((x, y + 9), f"{label}: {bounded}%", fontsize=9, fontname="helv")
+        page.draw_rect(fitz.Rect(x + 115, y, x + 315, y + 10), color=(0.78, 0.78, 0.78), fill=(0.92, 0.92, 0.92))
+        page.draw_rect(fitz.Rect(x + 115, y, x + 115 + bounded * 2, y + 10), color=(0.12, 0.38, 0.78), fill=(0.12, 0.38, 0.78))
+        y += 18
 
 
 def render_ai_mentor_chat(context: dict[str, object]) -> None:
@@ -545,7 +657,9 @@ def render_resume_insights(resume: ResumeParseResult, missing_skills: list[str])
 def render_github_analysis(analysis: GitHubAnalysis) -> None:
     st.subheader("GitHub Profile Analysis")
     st.caption(f"Public portfolio analysis for `{analysis.username}`.")
+    render_github_nav()
 
+    section_anchor("github-overview")
     metric_cols = st.columns(4)
     with metric_cols[0]:
         render_metric("GitHub Score", f"{analysis.github_score}%", "Repository depth, stars, skills, activity, and project quality.")
@@ -558,6 +672,18 @@ def render_github_analysis(analysis: GitHubAnalysis) -> None:
     with metric_cols[3]:
         render_metric("Portfolio Strength", analysis.portfolio_strength, f"Activity level: {analysis.activity_level}")
 
+    section_anchor("github-stats")
+    stats_cols = st.columns(4)
+    with stats_cols[0]:
+        render_metric("Followers", str(analysis.followers), f"Following {analysis.following}")
+    with stats_cols[1]:
+        render_metric("Total Stars", f"{analysis.total_stars:,}", f"Forks {analysis.total_forks:,}")
+    with stats_cols[2]:
+        render_metric("Years Active", str(analysis.years_active), f"Public gists {analysis.public_gists}")
+    with stats_cols[3]:
+        render_metric("Open Source Impact", analysis.open_source_contribution_level, f"Top repo: {analysis.most_starred_repository}")
+
+    section_anchor("github-languages")
     chart_cols = st.columns([1, 1])
     with chart_cols[0]:
         st.markdown("**Languages Used**")
@@ -578,8 +704,30 @@ def render_github_analysis(analysis: GitHubAnalysis) -> None:
         else:
             st.info("No repository languages detected.")
     with chart_cols[1]:
+        st.markdown("**Project Categories**")
+        render_count_chart(analysis.category_counts, "Category", "Repositories")
+
+    extra_chart_cols = st.columns([1, 1])
+    with extra_chart_cols[0]:
+        st.markdown("**Repository Quality Distribution**")
+        render_count_chart(analysis.quality_distribution, "Quality", "Repositories")
+    with extra_chart_cols[1]:
+        st.markdown("**Technology Stack Distribution**")
+        render_count_chart(analysis.technology_stack_counts, "Technology", "Repositories")
+
+    section_anchor("github-skills")
+    skill_cols = st.columns([1, 1])
+    with skill_cols[0]:
         st.markdown("**Top Skills**")
         render_skill_grid(analysis.top_skills)
+    with skill_cols[1]:
+        st.markdown("**Portfolio Insights**")
+        render_pills([
+            f"Most used language: {analysis.most_used_language}",
+            f"Average repository quality: {analysis.project_quality_score}%",
+            f"Most starred repository: {analysis.most_starred_repository}",
+            f"Activity level: {analysis.activity_level}",
+        ])
 
     project_cols = st.columns(2)
     with project_cols[0]:
@@ -587,12 +735,70 @@ def render_github_analysis(analysis: GitHubAnalysis) -> None:
     with project_cols[1]:
         render_metric("Web Projects", str(len(analysis.web_projects)), "Detected from repository names, topics, and descriptions.")
 
+    section_anchor("github-repos")
     st.markdown("**Project Summary Cards**")
     render_project_summary_cards(analysis.repos)
 
-    with st.expander("Recommendations", expanded=True):
+    section_anchor("github-careers")
+    st.markdown("**Career Recommendations From GitHub**")
+    career_cols = st.columns(min(4, max(1, len(analysis.suitable_careers))))
+    for column, career in zip(career_cols, analysis.suitable_careers):
+        with column:
+            with st.container(border=True):
+                st.markdown(f"**{career['career']}**")
+                st.caption(career["why"])
+
+    section_anchor("github-strengths")
+    sw_cols = st.columns(2)
+    with sw_cols[0]:
+        st.markdown("**Strengths**")
+        for strength in analysis.strengths:
+            st.write(f"- {strength}")
+    with sw_cols[1]:
+        st.markdown("**Weaknesses**")
+        for weakness in analysis.weaknesses:
+            st.write(f"- {weakness}")
+
+    section_anchor("github-suggestions")
+    with st.expander("Improvement Suggestions", expanded=True):
         for recommendation in analysis.recommendations:
             st.write(f"- {recommendation}")
+
+
+def render_github_nav() -> None:
+    sections = [
+        ("github-overview", "Overview"),
+        ("github-stats", "GitHub Statistics"),
+        ("github-languages", "Languages"),
+        ("github-skills", "Skills"),
+        ("github-skills", "Portfolio Insights"),
+        ("github-repos", "Repository Analysis"),
+        ("github-languages", "Project Categories"),
+        ("github-careers", "Career Recommendations"),
+        ("github-strengths", "Strengths & Weaknesses"),
+        ("github-suggestions", "Improvement Suggestions"),
+    ]
+    links = "".join(f'<a href="#{section_id}">{label}</a>' for section_id, label in sections)
+    st.markdown(f'<nav class="dashboard-section-nav" aria-label="GitHub analysis sections">{links}</nav>', unsafe_allow_html=True)
+
+
+def render_count_chart(counts: dict[str, int], label: str, value: str) -> None:
+    if not counts:
+        st.info("No data available yet.")
+        return
+    data = pd.DataFrame([{label: key, value: val} for key, val in counts.items()])
+    st.altair_chart(
+        alt.Chart(data)
+        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X(f"{label}:N", sort="-y", axis=alt.Axis(labelAngle=-30)),
+            y=alt.Y(f"{value}:Q"),
+            tooltip=[label, value],
+            color=alt.Color(f"{label}:N", legend=None),
+        )
+        .properties(height=260),
+        use_container_width=True,
+    )
 
 
 def render_github_cta() -> None:
@@ -631,18 +837,38 @@ def render_project_summary_cards(repos: list[object]) -> None:
 
     for repo in repos:
         with st.container(border=True):
-            st.markdown(f"**{repo.name}**")
-            st.caption(repo.project_type)
-            st.write(repo.description)
-            detail_cols = st.columns(3)
+            header_cols = st.columns([2, 1])
+            with header_cols[0]:
+                st.markdown(f"**{repo.name}**")
+                st.caption(repo.description)
+            with header_cols[1]:
+                st.metric("Quality", f"{repo.quality_score}%")
+            detail_cols = st.columns(4)
             with detail_cols[0]:
                 st.metric("Stars", repo.stars)
             with detail_cols[1]:
-                st.metric("Language", repo.language)
+                st.metric("Forks", getattr(repo, "forks", 0))
             with detail_cols[2]:
-                st.metric("Quality", f"{repo.quality_score}%")
+                st.metric("Language", repo.language)
+            with detail_cols[3]:
+                st.metric("Difficulty", getattr(repo, "difficulty_level", "Beginner"))
+            meta_cols = st.columns(3)
+            with meta_cols[0]:
+                st.caption(f"Category: {repo.project_type}")
+            with meta_cols[1]:
+                st.caption(f"Updated: {format_github_date(repo.updated_at)}")
+            with meta_cols[2]:
+                st.caption(f"Size: {getattr(repo, 'size_kb', 0):,} KB")
+            if getattr(repo, "topics", []):
+                render_pills(repo.topics[:8])
             if repo.url:
                 st.link_button("Open repository", repo.url)
+
+
+def format_github_date(value: str) -> str:
+    if not value:
+        return "Unknown"
+    return value[:10]
 
 
 def career_match_reason(match: dict[str, object]) -> str:
@@ -697,7 +923,10 @@ def render_resume_match_score(
         columns = st.columns(5)
         for column, (label, score) in zip(columns, score_items[start : start + 5]):
             with column:
-                render_circular_score(label, score)
+                if isinstance(score, int):
+                    render_circular_score(label, score)
+                else:
+                    render_metric(label, str(score), "Not applicable for this career/profile.")
 
     summary_cols = st.columns(2)
     with summary_cols[0]:
@@ -902,6 +1131,28 @@ def render_universal_career_intelligence(
     with cert_cols[1]:
         st.markdown("**Interview Pattern**")
         render_pills(list(career_knowledge.get("interview_pattern", []))[:6])
+
+    with st.expander("Role Intelligence", expanded=False):
+        role_cols = st.columns(3)
+        role_sections = [
+            ("Daily Responsibilities", list(career_knowledge.get("daily_responsibilities", []))),
+            ("KPIs", list(career_knowledge.get("kpis", []))),
+            ("ATS Keywords", list(career_knowledge.get("ats_keywords", []))),
+            ("Resume Keywords", list(career_knowledge.get("resume_keywords", []))),
+            ("Licensing Requirements", list(career_knowledge.get("licensing_requirements", []))),
+            ("Transition Paths", list(career_knowledge.get("transition_paths", []))),
+        ]
+        for index, (label, values) in enumerate(role_sections):
+            with role_cols[index % 3]:
+                st.markdown(f"**{label}**")
+                render_pills(values[:6])
+        if career_knowledge.get("work_environment"):
+            st.markdown("**Work Environment**")
+            st.caption(str(career_knowledge.get("work_environment")))
+        if career_knowledge.get("industry_insights"):
+            st.markdown("**Industry Insights**")
+            for insight in list(career_knowledge.get("industry_insights", []))[:3]:
+                st.write(f"- {insight}")
 
     discovery_query = st.text_input(
         "Career discovery from interests",
@@ -1349,7 +1600,7 @@ def profile_form(careers: dict[str, dict]) -> UserProfile | None:
 
     if method == "Upload Resume":
         st.sidebar.info("Upload Resume is recommended for faster profile creation.")
-        uploaded_resume = st.sidebar.file_uploader("Upload resume", type=["pdf", "docx", "jpg", "jpeg", "png"])
+        uploaded_resume = st.sidebar.file_uploader("Upload resume", type=["pdf", "docx", "txt", "jpg", "jpeg", "png"])
         if uploaded_resume:
             current_file_key = uploaded_file_key(uploaded_resume)
             if st.session_state.get("resume_file_key") != current_file_key:
@@ -1487,12 +1738,13 @@ def main() -> None:
         else:
             st.divider()
             render_github_cta()
-        render_about_developer()
+        render_feedback_contact()
         render_footer()
         return
 
     selected_career = careers[profile.career_goal]
     career_knowledge = get_career_knowledge(profile.career_goal, selected_career)
+    github_relevant = is_github_relevant(career_knowledge)
     readiness = calculate_readiness(profile, selected_career)
     country_intelligence = get_country_career_intelligence(profile.career_goal, profile.target_country, selected_career)
     probability = calculate_success_probability(profile, readiness["score"], len(readiness["missing_skills"]))
@@ -1506,11 +1758,11 @@ def main() -> None:
         profile.target_country,
         profile.weekly_study_hours,
     )
-    resume_match = analyze_resume_match(resume, profile, selected_career, github_analysis) if resume else None
+    resume_match = analyze_resume_match(resume, profile, career_knowledge, github_analysis if github_relevant else None) if resume else None
     mentor_context = build_mentor_context(
         profile=profile,
         resume=resume,
-        github_analysis=github_analysis,
+        github_analysis=github_analysis if github_relevant else None,
         country_intelligence=country_intelligence,
         roadmap=roadmap_items,
         missing_skills=readiness["missing_skills"],
@@ -1523,7 +1775,9 @@ def main() -> None:
         save_profile(profile, readiness, probability)
         st.sidebar.success("Snapshot saved.")
 
+    section_anchor("overview")
     st.subheader(f"{profile.career_goal} in {profile.target_country}")
+    render_dashboard_nav(bool(resume), bool(github_analysis and github_relevant))
     metric_cols = st.columns(4)
     with metric_cols[0]:
         render_metric("Readiness Score", f"{readiness['score']}%", "Skills plus projects, internships, certifications, and study consistency.")
@@ -1542,8 +1796,9 @@ def main() -> None:
         readiness,
         probability,
         country_intelligence,
+        career_knowledge,
         resume,
-        github_analysis,
+        github_analysis if github_relevant else None,
         resume_match,
         roadmap_items,
     )
@@ -1570,31 +1825,39 @@ def main() -> None:
             )
 
     st.divider()
+    section_anchor("career-twin")
     render_digital_twin(profile, readiness, probability, country_intelligence)
     st.divider()
+    section_anchor("country-intelligence")
     render_country_intelligence(country_intelligence)
     st.divider()
 
+    section_anchor("career-intelligence")
     render_universal_career_intelligence(profile, resume, career_knowledge, readiness["missing_skills"])
     st.divider()
 
     if resume:
+        section_anchor("resume-analysis")
         render_resume_insights(resume, readiness["missing_skills"])
         st.divider()
+        section_anchor("career-recommendations")
         render_resume_career_recommendations(profile, resume, careers)
         st.divider()
 
     if resume and resume_match:
+        section_anchor("resume-match")
         render_resume_match_score(resume_match, resume, careers)
         st.divider()
 
-    if github_analysis:
+    if github_analysis and github_relevant:
+        section_anchor("github-analysis")
         render_github_analysis(github_analysis)
         st.divider()
-    else:
+    elif not github_analysis and github_relevant:
         render_github_cta()
         st.divider()
 
+    section_anchor("skill-gap")
     gap_cols = st.columns([1, 1])
     with gap_cols[0]:
         st.subheader("Skill Gap Analysis")
@@ -1607,6 +1870,7 @@ def main() -> None:
 
     st.divider()
 
+    section_anchor("career-match")
     st.subheader("Career Match Engine")
     match_cols = st.columns(4)
     for column, match in zip(match_cols, top_matches):
@@ -1619,6 +1883,7 @@ def main() -> None:
 
     st.divider()
 
+    section_anchor("probability")
     with st.spinner("Generating career probability reasoning..."):
         explanation = generate_explanation(profile, readiness)
     with st.container():
@@ -1647,6 +1912,7 @@ def main() -> None:
 
     st.divider()
 
+    section_anchor("future-simulation")
     st.subheader("Future Simulation Notes")
     with st.spinner("Generating future simulation notes..."):
         gemini_future = generate_future_simulation(profile, readiness)
@@ -1658,6 +1924,7 @@ def main() -> None:
 
     st.divider()
 
+    section_anchor("roadmap")
     st.subheader("AI Career Roadmap")
     with st.spinner("Generating AI roadmap notes..."):
         gemini_roadmap = generate_roadmap(profile, readiness)
@@ -1668,6 +1935,7 @@ def main() -> None:
 
     st.divider()
 
+    section_anchor("action-plan")
     action_cols = st.columns([2, 1])
     with action_cols[0]:
         st.subheader("Weekly Action Plan")
@@ -1689,7 +1957,8 @@ def main() -> None:
         else:
             st.caption("No saved snapshots yet.")
 
-    render_about_developer()
+    section_anchor("feedback")
+    render_feedback_contact()
     render_footer()
 
 

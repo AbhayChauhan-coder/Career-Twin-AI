@@ -33,7 +33,7 @@ STOP_WORDS = {
 @dataclass
 class ResumeMatchAnalysis:
     overall_match: int
-    weighted_scores: dict[str, int]
+    weighted_scores: dict[str, int | str]
     strengths: list[str]
     weaknesses: list[str]
     critical_missing_skills: list[str]
@@ -63,19 +63,22 @@ def analyze_resume_match(
     github_analysis: GitHubAnalysis | None = None,
 ) -> ResumeMatchAnalysis:
     required_skills = career_definition.get("required_skills", [])
-    resume_skills = set(normalize(skill) for skill in resume.skills or profile.skills)
-    required_skill_set = set(normalize(skill) for skill in required_skills)
-    matched_required = required_skill_set & resume_skills
-    missing_required = [skill for skill in required_skills if normalize(skill) not in resume_skills]
+    resume_skill_values = resume.skills or profile.skills
+    matched_required = {skill for skill in required_skills if semantic_contains(skill, resume_skill_values)}
+    missing_required = [skill for skill in required_skills if skill not in matched_required]
+    required_skill_set = set(canonical_term(skill) for skill in required_skills)
 
     technical = percent(len(matched_required), len(required_skill_set))
     soft = soft_skill_score(resume)
     projects = min(len(resume.structured_projects or resume.projects), 3) / 3 * 100
-    experience = min(len(resume.structured_experience or resume.experience), 2) / 2 * 100
-    internships = 100 if any("intern" in item.casefold() for item in resume.experience) else 0
+    experience_count = len(resume.structured_experience or resume.experience)
+    experience = min(experience_count, 3) / 3 * 100
+    has_professional_experience = experience_count > 0 and not all("intern" in item.casefold() for item in resume.experience)
+    internships: int | str = "N/A" if has_professional_experience else (100 if any("intern" in item.casefold() for item in resume.experience) else 0)
     education = 100 if resume.degree or resume.education else 0
     certifications = min(len(resume.structured_certifications or resume.certifications), 2) / 2 * 100
-    github = github_analysis.github_score if github_analysis else 0
+    github_relevant = is_github_relevant(career_definition)
+    github: int | str = github_analysis.github_score if github_analysis and github_relevant else ("N/A" if not github_relevant else 0)
     ats = resume.ats_readiness_score
     industry = resume.industry_readiness_score
 
@@ -84,10 +87,10 @@ def analyze_resume_match(
         "Soft Skills": round(soft),
         "Projects": round(projects),
         "Experience": round(experience),
-        "Internships": round(internships),
+        "Internships": internships if isinstance(internships, str) else round(internships),
         "Education": round(education),
         "Certifications": round(certifications),
-        "GitHub": round(github),
+        "GitHub": github if isinstance(github, str) else round(github),
         "ATS Compatibility": round(ats),
         "Industry Readiness": round(industry),
     }
@@ -103,7 +106,9 @@ def analyze_resume_match(
         "ATS Compatibility": 0.10,
         "Industry Readiness": 0.10,
     }
-    overall = round(sum(weighted_scores[key] * weights[key] for key in weights))
+    applicable = {key: value for key, value in weighted_scores.items() if isinstance(value, int)}
+    applicable_weight_total = sum(weights[key] for key in applicable)
+    overall = round(sum(applicable[key] * weights[key] for key in applicable) / applicable_weight_total) if applicable_weight_total else 0
 
     critical, important, nice = split_missing_skills(missing_required)
     strengths = build_strengths(weighted_scores, matched_required, required_skills)
@@ -133,9 +138,8 @@ def compare_resume_to_job_description(
 
     skill_bank = build_skill_bank(careers)
     jd_skills = detect_skills(normalized_jd, skill_bank)
-    resume_skill_set = {normalize(skill) for skill in resume.skills}
-    matched_keywords = [skill for skill in jd_skills if normalize(skill) in resume_skill_set]
-    missing_keywords = [skill for skill in jd_skills if normalize(skill) not in resume_skill_set]
+    matched_keywords = [skill for skill in jd_skills if semantic_contains(skill, resume.skills)]
+    missing_keywords = [skill for skill in jd_skills if not semantic_contains(skill, resume.skills)]
 
     keyword_match = percent(len(matched_keywords), len(jd_skills))
     semantic_match = semantic_overlap(resume.text, normalized_jd)
@@ -160,7 +164,55 @@ def compare_resume_to_job_description(
 
 
 def normalize(value: str) -> str:
-    return value.strip().casefold()
+    return canonical_term(value)
+
+
+SEMANTIC_EQUIVALENTS = {
+    "construction supervision": {"site supervision", "site execution", "construction management"},
+    "financial reporting": {"financial statements", "financial statement analysis", "reporting"},
+    "autocad": {"autocad civil", "auto cad"},
+    "python": {"python programming", "python development"},
+    "communication": {"communication skills", "verbal communication"},
+    "rest apis": {"rest api", "api development", "api design"},
+    "machine learning": {"ml", "predictive modeling"},
+    "recruitment": {"talent acquisition", "sourcing"},
+    "patient care": {"patient handling", "clinical care"},
+    "legal research": {"case law research"},
+}
+
+
+def canonical_term(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9+#. ]", " ", value.casefold())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    for canonical, variants in SEMANTIC_EQUIVALENTS.items():
+        if normalized == canonical or normalized in variants:
+            return canonical
+    return normalized
+
+
+def semantic_contains(required: str, available_values: list[str]) -> bool:
+    required_key = canonical_term(required)
+    variants = {required_key, *SEMANTIC_EQUIVALENTS.get(required_key, set())}
+    available = {canonical_term(value) for value in available_values}
+    if variants & available:
+        return True
+    joined = " ".join(available_values).casefold()
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(variant) + r"(?![a-z0-9])", joined) for variant in variants)
+
+
+def is_github_relevant(career_definition: dict[str, Any]) -> bool:
+    domain = str(career_definition.get("domain", "")).casefold()
+    career_text = " ".join(
+        [
+            str(career_definition.get("name", "")),
+            str(career_definition.get("description", "")),
+            " ".join(career_definition.get("required_skills", [])),
+            " ".join(career_definition.get("technical_skills", [])),
+        ]
+    ).casefold()
+    if domain in {"technology"}:
+        return True
+    return any(term in career_text for term in ["software", "developer", "data", "ai", "machine learning", "cyber", "cloud", "devops", "programming"])
 
 
 def normalize_text(value: str) -> str:
@@ -182,28 +234,28 @@ def split_missing_skills(missing_skills: list[str]) -> tuple[list[str], list[str
     return missing_skills[:3], missing_skills[3:7], missing_skills[7:]
 
 
-def build_strengths(weighted_scores: dict[str, int], matched_required: set[str], required_skills: list[str]) -> list[str]:
+def build_strengths(weighted_scores: dict[str, int | str], matched_required: set[str], required_skills: list[str]) -> list[str]:
     strengths = []
     if matched_required:
         strengths.append(f"Matches {len(matched_required)} target-career technical skill(s), which directly improves role fit.")
     for label, score in weighted_scores.items():
-        if score >= 75:
+        if isinstance(score, int) and score >= 75:
             strengths.append(f"{label} is strong because the resume provides enough evidence in this area.")
     return strengths[:6] or ["The resume has enough structure to begin matching against the selected career."]
 
 
-def build_weaknesses(weighted_scores: dict[str, int], missing_skills: list[str]) -> list[str]:
+def build_weaknesses(weighted_scores: dict[str, int | str], missing_skills: list[str]) -> list[str]:
     weaknesses = []
     if missing_skills:
         weaknesses.append(f"{len(missing_skills)} required skill(s) are missing from the resume, reducing technical match.")
     for label, score in weighted_scores.items():
-        if score < 45:
+        if isinstance(score, int) and score < 45:
             weaknesses.append(f"{label} is weak because the resume has limited visible proof for this category.")
     return weaknesses[:6]
 
 
 def build_suggestions(
-    weighted_scores: dict[str, int],
+    weighted_scores: dict[str, int | str],
     critical: list[str],
     important: list[str],
     nice: list[str],
@@ -217,14 +269,14 @@ def build_suggestions(
                 "why": f"{skill} is a critical missing skill for {career_goal}, so adding proof will raise the technical match score.",
             }
         )
-    if weighted_scores["Projects"] < 70:
+    if isinstance(weighted_scores["Projects"], int) and weighted_scores["Projects"] < 70:
         suggestions.append(
             {
                 "suggestion": "Add one role-specific portfolio project with tools, problem, and measurable result.",
                 "why": "Project evidence is weighted heavily because recruiters need proof that skills were applied.",
             }
         )
-    if weighted_scores["ATS Compatibility"] < 70:
+    if isinstance(weighted_scores["ATS Compatibility"], int) and weighted_scores["ATS Compatibility"] < 70:
         suggestions.append(
             {
                 "suggestion": "Use standard resume headings and include exact role keywords.",
