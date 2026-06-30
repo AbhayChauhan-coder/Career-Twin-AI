@@ -158,6 +158,26 @@ SKILLS_BY_DOMAIN = {
 }
 
 
+COMMON_SKILL_TERMS = {
+    "communication",
+    "presentation",
+    "documentation",
+    "leadership",
+    "problem solving",
+    "team collaboration",
+    "collaboration",
+    "stakeholder management",
+    "decision making",
+    "customer service",
+    "market research",
+    "data analysis",
+    "excel",
+    "project management",
+    "negotiation",
+    "english",
+}
+
+
 BASE_RESOURCES = {
     "books": ["The First 90 Days", "So Good They Can't Ignore You", "Designing Your Life"],
     "youtube_channels": ["CrashCourse", "Harvard Business Review", "TED-Ed"],
@@ -1849,44 +1869,51 @@ def recommend_careers_for_profile(
     designation = infer_current_designation(profile, resume)
     years = infer_years_experience(profile, resume)
     current_domain = getattr(resume, "detected_domain", "") if resume else ""
-    current_path = career_path_for(designation, current_domain) if designation and current_domain else []
     goal_name = str(getattr(profile, "career_goal", "") or "")
     goal_domain = str(careers.get(goal_name, {}).get("domain", "")) if goal_name else ""
     primary_domain = current_domain if current_domain and current_domain != "General" else goal_domain
     education = " ".join([getattr(profile, "degree", ""), getattr(profile, "branch", "")]).casefold()
     skills = [skill.casefold() for skill in getattr(profile, "skills", [])]
+    domain_scores = estimate_profile_domain_relevance(profile, resume, careers)
     designation_domain = domain_from_designation(designation, skills)
     if designation_domain:
         primary_domain = designation_domain
         current_domain = designation_domain
-        current_path = career_path_for(designation, current_domain)
         if not goal_domain:
             goal_domain = designation_domain
+    if not primary_domain and domain_scores:
+        primary_domain = max(domain_scores.items(), key=lambda item: item[1])[0]
+    current_path = career_path_for(designation, current_domain or primary_domain) if designation and (current_domain or primary_domain) else []
     explicit_switch = bool(goal_domain and primary_domain and goal_domain != primary_domain)
+    allowed_domains = selected_recommendation_domains(domain_scores, goal_domain, primary_domain)
+    if explicit_switch and goal_domain and domain_scores.get(goal_domain, 0) >= 28:
+        allowed_domains.add(goal_domain)
     certifications = [cert.casefold() for cert in getattr(profile, "certifications", [])]
     detected_domain = getattr(resume, "detected_domain", "") if resume else ""
     scored = []
     for name, career in careers.items():
-        required = [skill.casefold() for skill in career.get("required_skills", [])]
         degrees = " ".join(career.get("degree_requirements", [])).casefold()
         cert_targets = [cert.casefold() for cert in career.get("preferred_certifications", career.get("certifications", []))]
         career_domain = career.get("domain", "")
         if "physiotherapist" in name.casefold():
             career_domain = "Healthcare"
-        if primary_domain and career_domain != primary_domain and not (explicit_switch and career_domain == goal_domain):
+        if allowed_domains and career_domain not in allowed_domains:
             continue
 
         experience_score = experience_alignment_score(name, years)
         designation_score = text_similarity_score(designation, name + " " + " ".join(career.get("career_path", [])))
         education_score = text_similarity_score(education + " " + detected_domain, degrees + " " + career_domain)
-        skill_score = overlap_score(skills, required)
+        layered_skills = layered_skill_score(skills, {**career, "domain": career_domain})
+        skill_score = layered_skills["score"]
         cert_score = overlap_score(certifications, cert_targets)
+        domain_score = domain_scores.get(str(career_domain), 0)
         total = round(
-            experience_score * 0.35
-            + designation_score * 0.25
-            + education_score * 0.20
-            + skill_score * 0.15
-            + cert_score * 0.05
+            skill_score * 0.48
+            + min(domain_score, 100) * 0.18
+            + designation_score * 0.14
+            + education_score * 0.10
+            + experience_score * 0.06
+            + cert_score * 0.04
         )
         if years >= 3 and seniority_rank(name) <= 2:
             total -= 20
@@ -1908,35 +1935,43 @@ def recommend_careers_for_profile(
                     total += 30
         if primary_domain:
             if career_domain == primary_domain or (explicit_switch and career_domain == goal_domain):
-                total += 16
+                total += 8
             else:
                 total -= 65
         if detected_domain and career_domain == detected_domain:
-            total += 12
+            total += 6
         if goal_name:
             goal_key = goal_name.casefold()
             name_key = name.casefold()
             if name_key == goal_key:
-                total += 18
+                total += 12
             elif goal_key in name_key or name_key in goal_key:
-                total += 10
+                total += 7
             total += role_family_alignment_score(goal_key, name_key)
         if designation:
             designation_key = strip_seniority(designation).casefold()
             if designation_key and designation_key in name.casefold():
-                total += 26
+                total += 16
             if "ux" in designation_key and not any(term in name.casefold() for term in ["ux", "ui ux", "product designer"]):
                 total -= 24
             if "devops" in designation_key and career_domain != "Technology":
                 total -= 30
-        if total > 20:
+        total = min(total, int(layered_skills["cap"]))
+        total = max(0, total - recommendation_tie_penalty(goal_name, designation, name))
+        if total >= 100:
+            total = 98
+        if not layered_skills["missing_mandatory"] and len(layered_skills["matched_domain"]) >= max(4, len(layered_skills["domain_skills"]) - 1):
+            total = min(total + 2, 99)
+        if primary_domain and career_domain != primary_domain and total < 35:
+            continue
+        if total > 25:
             reasons = []
             if designation_score:
                 reasons.append("current designation")
             if education_score:
                 reasons.append("education/domain")
-            if skill_score:
-                reasons.append("skills")
+            if layered_skills["matched_domain"] or layered_skills["matched_mandatory"]:
+                reasons.append("domain skills")
             if years:
                 reasons.append(f"{years}+ years experience")
             matched_required = [skill for skill in career.get("required_skills", []) if skill.casefold() in skills]
@@ -1948,9 +1983,15 @@ def recommend_careers_for_profile(
                 explanation_parts.append(f"current designation: {designation}")
             if education_score:
                 explanation_parts.append("education/domain fit")
-            if matched_required:
-                explanation_parts.append("strengths: " + ", ".join(matched_required[:4]))
-            if missing_required:
+            if layered_skills["matched_mandatory"]:
+                explanation_parts.append("mandatory skills: " + ", ".join(layered_skills["matched_mandatory"][:3]))
+            if layered_skills["matched_domain"]:
+                explanation_parts.append("domain strengths: " + ", ".join(layered_skills["matched_domain"][:4]))
+            if layered_skills["matched_common"]:
+                explanation_parts.append("common skills: " + ", ".join(layered_skills["matched_common"][:2]))
+            if layered_skills["missing_mandatory"]:
+                explanation_parts.append("mandatory gaps cap score: " + ", ".join(layered_skills["missing_mandatory"][:3]))
+            elif missing_required:
                 explanation_parts.append("missing: " + ", ".join(missing_required[:3]))
             scored.append(
                 CareerRecommendation(
@@ -1963,13 +2004,28 @@ def recommend_careers_for_profile(
             )
     current_index = path_names.index(designation.casefold()) if designation and designation.casefold() in path_names else -1
 
-    def recommendation_sort_key(item: CareerRecommendation) -> tuple[int, int, int, str]:
+    goal_key_for_sort = goal_name.casefold()
+
+    def goal_alignment_rank(name: str) -> int:
+        name_key = name.casefold()
+        if goal_key_for_sort and name_key == goal_key_for_sort:
+            return 4
+        if goal_key_for_sort and (goal_key_for_sort in name_key or strip_seniority(goal_key_for_sort) in strip_seniority(name_key)):
+            return 3
+        if goal_key_for_sort and role_family_alignment_score(goal_key_for_sort, name_key) > 0:
+            return 2
+        if designation and strip_seniority(designation).casefold() in name_key:
+            return 1
+        return 0
+
+    def recommendation_sort_key(item: CareerRecommendation) -> tuple[int, int, int, int, str]:
         name_key = item.career.casefold()
+        goal_rank = goal_alignment_rank(item.career)
         if current_index >= 0 and name_key in path_names:
             role_index = path_names.index(name_key)
             if role_index > current_index:
-                return (1, item.fit_score, -role_index, item.career.casefold())
-        return (0, item.fit_score, -seniority_rank(item.career), item.career.casefold())
+                return (1, goal_rank, item.fit_score, -role_index, item.career.casefold())
+        return (0, goal_rank, item.fit_score, -seniority_rank(item.career), item.career.casefold())
 
     return sorted(scored, key=recommendation_sort_key, reverse=True)[:limit]
 
@@ -2020,6 +2076,10 @@ def role_family_alignment_score(goal_key: str, name_key: str) -> int:
         (["journalist", "journalism", "media"], ["journalist", "journalism", "editor", "reporter", "media", "news"], -42),
         (["physiotherapist", "physiotherapy"], ["physiotherapist", "physiotherapy", "rehabilitation", "clinical"], -38),
         (["interior designer", "interior design"], ["interior", "designer", "space", "architecture"], -35),
+        (["audit", "chartered accountant"], ["audit", "accountant", "finance", "controller", "tax", "financial"], -35),
+        (["sales executive", "sales"], ["sales", "account", "business development", "customer"], -32),
+        (["hotel manager", "hospitality"], ["hotel", "hospitality", "guest", "restaurant", "tourism"], -34),
+        (["pharmaceutical scientist", "pharmaceutical"], ["pharmaceutical", "pharmacist", "drug", "clinical", "bioprocess", "quality assurance"], -34),
     ]
     for goal_terms, allowed_terms, penalty in families:
         if any(term in goal_key for term in goal_terms):
@@ -2027,6 +2087,32 @@ def role_family_alignment_score(goal_key: str, name_key: str) -> int:
                 return 26
             return penalty
     return 0
+
+
+def recommendation_tie_penalty(goal_name: str, designation: str, career_name: str) -> int:
+    goal_key = strip_seniority(goal_name).casefold()
+    designation_key = strip_seniority(designation).casefold()
+    career_key = strip_seniority(career_name).casefold()
+    raw_career_key = career_name.casefold()
+    if goal_key and career_key == goal_key:
+        if raw_career_key == goal_key:
+            return 0
+        if raw_career_key.startswith("junior "):
+            return 4
+        if raw_career_key.startswith("associate "):
+            return 3
+        if raw_career_key.startswith("senior "):
+            return 2
+        if raw_career_key.startswith("lead "):
+            return 5
+        return 1
+    if designation_key and career_key == designation_key:
+        return 1
+    if goal_key and (goal_key in career_key or career_key in goal_key):
+        return min(3, max(1, seniority_rank(career_name) - 1))
+    if goal_key and role_family_alignment_score(goal_key, career_key) > 0:
+        return min(5, seniority_rank(career_name))
+    return min(7, seniority_rank(career_name) + 3)
 
 
 def infer_years_experience(profile: Any, resume: Any | None) -> int:
@@ -2085,6 +2171,117 @@ def text_similarity_score(source: str, target: str) -> int:
         return 0
     overlap = len(source_tokens & target_tokens)
     return min(100, round(overlap / max(1, len(source_tokens)) * 100))
+
+
+def estimate_profile_domain_relevance(
+    profile: Any,
+    resume: Any | None,
+    careers: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    """Score career domains before individual career ranking."""
+    designation = infer_current_designation(profile, resume)
+    skills = [str(skill).casefold() for skill in getattr(profile, "skills", [])]
+    projects = " ".join(str(item) for item in getattr(profile, "projects", []))
+    certifications = " ".join(str(item) for item in getattr(profile, "certifications", []))
+    experience = " ".join(str(item) for item in getattr(profile, "internships", []))
+    resume_text = getattr(resume, "text", "") if resume else ""
+    education = " ".join([getattr(profile, "degree", ""), getattr(profile, "branch", "")])
+    signal_text = " ".join([designation, education, projects, certifications, experience, resume_text]).casefold()
+    scores: dict[str, int] = {}
+    detected_domain = getattr(resume, "detected_domain", "") if resume else ""
+    if detected_domain and detected_domain != "General":
+        scores[detected_domain] = scores.get(detected_domain, 0) + 18
+    designation_domain = domain_from_designation(designation, skills)
+    if designation_domain:
+        scores[designation_domain] = scores.get(designation_domain, 0) + 34
+    goal_name = str(getattr(profile, "career_goal", "") or "")
+    goal_domain = str(careers.get(goal_name, {}).get("domain", "")) if goal_name else ""
+    if goal_domain:
+        scores[goal_domain] = scores.get(goal_domain, 0) + 10
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        keyword_hits = sum(1 for keyword in keywords if keyword.casefold() in signal_text)
+        skill_hits = sum(1 for skill in skills if skill in {item.casefold() for item in SKILLS_BY_DOMAIN.get(domain, [])})
+        if keyword_hits or skill_hits:
+            scores[domain] = scores.get(domain, 0) + keyword_hits * 6 + skill_hits * 9
+    for career in careers.values():
+        domain = str(career.get("domain", ""))
+        if not domain:
+            continue
+        required = {str(skill).casefold() for skill in career.get("required_skills", [])}
+        overlap = len(required & set(skills))
+        if overlap >= 2:
+            scores[domain] = scores.get(domain, 0) + min(overlap * 2, 8)
+    return {domain: min(score, 100) for domain, score in scores.items() if score > 0}
+
+
+def selected_recommendation_domains(domain_scores: dict[str, int], goal_domain: str, primary_domain: str) -> set[str]:
+    if not domain_scores:
+        return {domain for domain in [primary_domain, goal_domain] if domain}
+    top_score = max(domain_scores.values())
+    selected = {domain for domain, score in domain_scores.items() if score >= max(18, top_score * 0.72)}
+    if primary_domain and domain_scores.get(primary_domain, 0) >= 12:
+        selected.add(primary_domain)
+    if goal_domain:
+        goal_score = domain_scores.get(goal_domain, 0)
+        primary_score = domain_scores.get(primary_domain, 0) if primary_domain else 0
+        if goal_domain == primary_domain or goal_score >= max(22, primary_score * 0.82):
+            selected.add(goal_domain)
+    return selected
+
+
+def classify_career_skills(career: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
+    required = [str(skill).casefold() for skill in career.get("required_skills", []) if str(skill).strip()]
+    domain = str(career.get("domain", ""))
+    domain_terms = {str(skill).casefold() for skill in SKILLS_BY_DOMAIN.get(domain, [])}
+    technical_terms = {str(skill).casefold() for skill in career.get("technical_skills", [])}
+    mandatory = []
+    domain_skills = []
+    common_skills = []
+    for skill in required:
+        if skill in COMMON_SKILL_TERMS:
+            common_skills.append(skill)
+        elif skill in domain_terms or skill in technical_terms:
+            domain_skills.append(skill)
+        else:
+            domain_skills.append(skill)
+    for skill in domain_skills[:3]:
+        if skill not in mandatory:
+            mandatory.append(skill)
+    return common_skills, domain_skills, mandatory
+
+
+def layered_skill_score(user_skills: list[str], career: dict[str, Any]) -> dict[str, Any]:
+    user_set = {str(skill).casefold() for skill in user_skills}
+    common_skills, domain_skills, mandatory_skills = classify_career_skills(career)
+    matched_common = [skill for skill in common_skills if skill in user_set]
+    matched_domain = [skill for skill in domain_skills if skill in user_set]
+    matched_mandatory = [skill for skill in mandatory_skills if skill in user_set]
+    missing_mandatory = [skill for skill in mandatory_skills if skill not in user_set]
+
+    common_score = min(3, len(matched_common) * 1.0)
+    domain_score = min(45, len(matched_domain) * 10)
+    mandatory_score = min(30, len(matched_mandatory) * (30 / max(1, len(mandatory_skills))))
+    score = round(common_score + domain_score + mandatory_score)
+
+    if not mandatory_skills:
+        cap = 86
+    elif not matched_mandatory:
+        cap = 58
+    elif missing_mandatory:
+        cap = 74 if len(missing_mandatory) >= 2 else 84
+    else:
+        cap = 98
+    return {
+        "score": min(score, cap),
+        "cap": cap,
+        "matched_common": matched_common,
+        "matched_domain": matched_domain,
+        "matched_mandatory": matched_mandatory,
+        "missing_mandatory": missing_mandatory,
+        "common_skills": common_skills,
+        "domain_skills": domain_skills,
+        "mandatory_skills": mandatory_skills,
+    }
 
 
 def overlap_score(source: list[str], target: list[str]) -> int:

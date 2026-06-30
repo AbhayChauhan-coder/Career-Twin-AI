@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from services.scoring import calibrated_score
+
 
 AI_KEYWORDS = {
     "ai",
@@ -428,7 +430,7 @@ def repo_quality_score(repo: GitHubRepoSummary) -> int:
             score += 5
         elif age > 900:
             score -= 10
-    score = max(0, min(score, 100))
+    score = calibrated_score("projects", score)
     if repo.stars < 10 and repo.forks < 3:
         score = min(score, 72)
     elif repo.stars < 100:
@@ -436,9 +438,9 @@ def repo_quality_score(repo: GitHubRepoSummary) -> int:
     elif repo.stars < 1000:
         score = min(score, 90)
     elif repo.stars < 10000:
-        score = min(score, 95)
+        score = min(score, 92)
     elif repo.stars < 50000:
-        score = min(score, 98)
+        score = min(score, 94)
     if not repo.has_readme_signal:
         score = min(score, 88)
     if repo.updated_at and days_since(repo.updated_at) > 1200:
@@ -450,7 +452,7 @@ def calculate_project_quality_score(repos: list[GitHubRepoSummary]) -> int:
     if not repos:
         return 0
     top_repos = sorted(repos, key=lambda repo: repo.quality_score, reverse=True)[:5]
-    return round(sum(repo.quality_score for repo in top_repos) / len(top_repos))
+    return calibrated_score("projects", sum(repo.quality_score for repo in top_repos) / len(top_repos))
 
 
 def calculate_activity_level(repos: list[GitHubRepoSummary]) -> str:
@@ -491,15 +493,15 @@ def calculate_github_score(
     score += round(project_quality_score * 0.25)
     score += round(documentation_score * 0.06)
     score += round(recent_ratio * 6)
-    score = max(0, min(score, 100))
+    score = calibrated_score("github", score)
     if stars < 1000 and followers < 500:
         score = min(score, 78)
     elif stars < 10000 and followers < 3000:
         score = min(score, 88)
     elif stars < 50000 and followers < 10000:
-        score = min(score, 94)
+        score = min(score, 90)
     elif stars < 100000 and followers < 50000:
-        score = min(score, 97)
+        score = min(score, 94)
     return score
 
 
@@ -659,8 +661,8 @@ def has_readme_signal(repo: dict[str, Any], topics: list[str]) -> bool:
 def average_documentation_score(repos: list[GitHubRepoSummary]) -> int:
     if not repos:
         return 0
-    scores = [100 if repo.has_readme_signal and repo.description != "No description provided." else 45 if repo.description != "No description provided." else 10 for repo in repos]
-    return round(sum(scores) / len(scores))
+    scores = [88 if repo.has_readme_signal and repo.description != "No description provided." else 45 if repo.description != "No description provided." else 10 for repo in repos]
+    return calibrated_score("ats_readiness", sum(scores) / len(scores))
 
 
 def recent_activity_ratio(repos: list[GitHubRepoSummary]) -> float:

@@ -15,6 +15,7 @@ from services.career_knowledge import (
     categorize_skills_for_domain,
     detect_candidate_domain,
 )
+from services.scoring import calibrated_score, has_senior_evidence
 
 
 COMMON_SKILLS = {
@@ -873,24 +874,47 @@ def calculate_field_confidence(result: ResumeParseResult) -> dict[str, float]:
 
 
 def calculate_resume_scores(result: ResumeParseResult, github_score: int = 0) -> dict[str, int]:
+    years = infer_experience_years_from_resume(result)
+    substantial_projects = len(result.structured_projects or result.projects)
+    senior_evidence = has_senior_evidence(years, substantial_projects, len(result.certifications), result.achievements)
     education = 10 if result.education or result.degree else 0
-    projects = min(len(result.projects), 3) / 3 * 20
+    projects = min(substantial_projects, 4) / 4 * 18
     skills = min(len(result.skills), 12) / 12 * 25
-    experience = min(len(result.experience), 2) / 2 * 15
-    internships = 10 if any("intern" in item.casefold() for item in result.experience) else 0
-    certifications = min(len(result.certifications), 2) / 2 * 10
-    github = min(github_score, 100) * 0.05
-    ats = calculate_ats_score(result) * 0.05
+    experience = min(len(result.experience), 4) / 4 * 18
+    internships = 5 if any("intern" in item.casefold() for item in result.experience) else 0
+    certifications = min(len(result.certifications), 4) / 4 * 9
+    github = min(github_score, 93) * 0.03
+    ats = calculate_ats_score(result) * 0.04
     resume_strength = round(education + projects + skills + experience + internships + certifications + github + ats)
-    completeness = round(sum([bool(result.name), bool(result.skills), bool(result.education), bool(result.projects), bool(result.experience), bool(result.certifications)]) / 6 * 100)
-    industry = round((skills / 25 * 45) + (projects / 20 * 35) + (experience / 15 * 20))
+    completeness_ratio = sum([bool(result.name), bool(result.skills), bool(result.education), bool(result.projects), bool(result.experience), bool(result.certifications)]) / 6
+    completeness = round(62 + completeness_ratio * 33) if result.text else 0
+    industry = round((skills / 25 * 38) + (projects / 18 * 30) + (experience / 18 * 24) + (certifications / 9 * 8))
     ats_readiness = calculate_ats_score(result)
+    resume_strength = calibrated_score("resume_strength", resume_strength, exceptional=senior_evidence, floor=35)
+    completeness = calibrated_score("resume_completeness", completeness, exceptional=senior_evidence, floor=45)
+    industry = calibrated_score("industry_readiness", industry, exceptional=senior_evidence, floor=30)
+    ats_readiness = calibrated_score("ats_readiness", ats_readiness, exceptional=senior_evidence, floor=35)
+    overall = round(resume_strength * 0.34 + industry * 0.30 + ats_readiness * 0.20 + completeness * 0.16)
+    genuine_fresher = bool((result.degree or result.education) and result.skills and (result.projects or result.certifications))
+    early_professional = 2 <= years <= 5 or (result.experience and result.projects and len(result.skills) >= 4)
+    if genuine_fresher:
+        overall = max(overall, 66)
+        resume_strength = max(resume_strength, 65)
+        industry = max(industry, 58)
+    if early_professional:
+        overall = max(overall, 78)
+        resume_strength = max(resume_strength, 76)
+        industry = max(industry, 72)
+    if senior_evidence:
+        overall = max(overall, 89)
+        resume_strength = max(resume_strength, 88)
+        industry = max(industry, 86)
     return {
-        "resume_strength": max(0, min(resume_strength, 100)),
-        "resume_completeness": max(0, min(completeness, 100)),
-        "industry_readiness": max(0, min(industry, 100)),
+        "resume_strength": resume_strength,
+        "resume_completeness": completeness,
+        "industry_readiness": industry,
         "ats_readiness": ats_readiness,
-        "overall_career_readiness": round((resume_strength + completeness + industry + ats_readiness) / 4),
+        "overall_career_readiness": calibrated_score("overall_career_readiness", overall, exceptional=senior_evidence, floor=30),
     }
 
 
@@ -903,7 +927,17 @@ def calculate_ats_score(result: ResumeParseResult) -> int:
     score += 15 if result.experience else 0
     score += 10 if result.certifications else 0
     score += 5 if len(result.text) > 600 else 0
-    return max(0, min(score, 100))
+    return calibrated_score("ats_readiness", score, floor=0)
+
+
+def infer_experience_years_from_resume(result: ResumeParseResult) -> int:
+    years = [int(year) for year in re.findall(r"\b(20\d{2}|19\d{2})\b", result.text)]
+    explicit = re.findall(r"\b(\d{1,2})\+?\s*(?:years|yrs)\b", result.text, flags=re.IGNORECASE)
+    if explicit:
+        return max(int(value) for value in explicit)
+    if len(years) >= 2:
+        return max(0, min(40, max(years) - min(years)))
+    return min(5, len(result.experience))
 
 
 def determine_extraction_status(result: ResumeParseResult) -> str:

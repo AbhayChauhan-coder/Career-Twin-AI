@@ -590,6 +590,7 @@ REGIONAL_COUNTRY_GROUPS = {
     ],
     "Europe": [
         "Czech Republic",
+        "Italy",
         "Hungary",
         "Romania",
         "Greece",
@@ -609,6 +610,7 @@ REGIONAL_COUNTRY_GROUPS = {
         "Ukraine",
         "Georgia",
         "Armenia",
+        "Russia",
     ],
     "Middle East": ["Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman", "Israel", "Jordan", "Lebanon"],
     "Africa": [
@@ -793,6 +795,7 @@ COUNTRY_CURRENCY_OVERRIDES = {
     "Guatemala": "GTQ",
     "El Salvador": "USD",
     "Czech Republic": "CZK",
+    "Italy": "EUR",
     "Hungary": "HUF",
     "Romania": "RON",
     "Greece": "EUR",
@@ -812,6 +815,7 @@ COUNTRY_CURRENCY_OVERRIDES = {
     "Ukraine": "UAH",
     "Georgia": "GEL",
     "Armenia": "AMD",
+    "Russia": "RUB",
     "Saudi Arabia": "SAR",
     "Qatar": "QAR",
     "Kuwait": "KWD",
@@ -1215,6 +1219,7 @@ def country_flag(country: str) -> str:
         "Sri Lanka": "LK",
         "Nepal": "NP",
         "Fiji": "FJ",
+        "Russia": "RU",
     }
     return flag_emoji(flags.get(country, country[:2].upper()))
 

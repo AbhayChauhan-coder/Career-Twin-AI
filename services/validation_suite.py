@@ -129,6 +129,12 @@ def run_validation_suite() -> dict[str, object]:
         names = [item.career for item in recommendations]
         joined_names = " ".join(names).casefold()
         reasons = []
+        if len(names) != len(set(name.casefold() for name in names)):
+            reasons.append(f"Duplicate recommendations found: {names}")
+        if any(item.fit_score >= 100 for item in recommendations):
+            reasons.append("Unrealistic perfect recommendation score found")
+        if len({item.fit_score for item in recommendations[:5]}) == 1 and len(recommendations) >= 5:
+            reasons.append("Top recommendations have identical scores")
         if resume.extraction_status == "Failed":
             reasons.append("Resume parser failed to extract useful data")
         if not resume.skills:
@@ -162,9 +168,9 @@ def run_validation_suite() -> dict[str, object]:
             reasons.append("Country intelligence missing industries or visa overview")
         if not (0 <= resume_match.overall_match <= 100):
             reasons.append("Resume match score outside 0-100")
-        if not (20 <= readiness["score"] <= 100):
+        if not (20 <= readiness["score"] <= 93):
             reasons.append(f"Career readiness score unrealistic: {readiness['score']}")
-        if not (20 <= probability <= 100):
+        if not (20 <= probability <= 90):
             reasons.append(f"Success probability unrealistic: {probability}")
         if readiness["score"] == probability and profile.project_count and profile.internship_count:
             reasons.append("Independent scoring failed: readiness and success probability were identical for a complete profile")
@@ -266,6 +272,31 @@ def expanded_validation_resumes() -> list[ValidationResume]:
                 "Used profession-appropriate tools, standards, and documentation.\n"
             ),
         ]
+        extra_layouts = [
+            ("Student Resume", "Academic Projects", "Campus learning project aligned with the profession."),
+            ("Fresher Profile", "Internship Readiness", "Entry-level proof through coursework, labs, or practice work."),
+            ("Experienced Resume", "Professional Achievements", "Improved measurable outcomes in the current role."),
+            ("OCR Extract", "Scanned Resume Text", "Text order may be noisy but core profession signals remain present."),
+            ("Manual Profile", "User Entered Details", "Profile was created manually from role, skills, and education."),
+            ("GitHub Profile", "Portfolio Evidence", "Public work samples or repositories support the career direction."),
+            ("No GitHub Profile", "Offline Portfolio", "Portfolio evidence comes from projects, reports, or case work."),
+            ("International Resume", "Country Fit", "Candidate is exploring overseas opportunities in the same profession."),
+            ("Career Switch Check", "Transition Intent", "No strong transition intent is stated; keep recommendations profession-specific."),
+            ("ATS Resume", "Keyword Evidence", "Resume includes role-specific keywords and domain-specific skills."),
+            ("Short Resume", "Compact Experience", "Minimal format with only the strongest professional signals."),
+            ("Detailed Resume", "Expanded Experience", "Detailed profile with education, skills, experience, and project evidence."),
+        ]
+        for title, section, detail in extra_layouts:
+            variants.append(
+                (
+                    f"{title}: {sample.name}\n"
+                    f"{sample.text}\n"
+                    f"{section}\n"
+                    f"{detail}\n"
+                    "Validation Note\n"
+                    "The recommender should stay within the same profession family unless explicit transition evidence exists.\n"
+                )
+            )
         for variant in variants:
             expanded.append(
                 ValidationResume(

@@ -52,13 +52,13 @@ def canonical_skill(skill: str) -> str:
 def score_label(score: int) -> str:
     if score >= 90:
         return "Exceptional"
-    if score >= 78:
+    if score >= 80:
         return "Advanced"
-    if score >= 65:
+    if score >= 68:
         return "Industry Ready"
-    if score >= 48:
+    if score >= 52:
         return "Developing"
-    if score >= 30:
+    if score >= 38:
         return "Foundation"
     return "Beginner"
 
@@ -77,14 +77,14 @@ def calculate_readiness(profile: UserProfile, career: dict[str, Any]) -> dict[st
     missing = [skill for skill in required if canonical_skill(skill) not in user_skills]
 
     skill_coverage = len(matched) / len(required) if required else min(len(user_skills) / 8, 1)
-    skill_score = skill_coverage * 42
-    education_score = 10 if profile.degree else 4
-    project_score = min(profile.project_count, 4) / 4 * 14
-    experience_score = min(profile.internship_count, 3) / 3 * 12
-    certification_score = min(profile.certification_count, 3) / 3 * 8
-    achievement_score = min(len([item for item in profile.achievements if item.strip()]), 3) / 3 * 5
-    language_score = min(len([item for item in profile.languages if item.strip()]), 2) / 2 * 3
-    study_score = min(profile.weekly_study_hours, 18) / 18 * 6
+    skill_score = skill_coverage * 36
+    education_score = 9 if profile.degree else 3
+    project_score = min(profile.project_count, 4) / 4 * 12
+    experience_score = min(profile.internship_count, 3) / 3 * 11
+    certification_score = min(profile.certification_count, 3) / 3 * 7
+    achievement_score = min(len([item for item in profile.achievements if item.strip()]), 3) / 3 * 4
+    language_score = min(len([item for item in profile.languages if item.strip()]), 2) / 2 * 2
+    study_score = min(profile.weekly_study_hours, 18) / 18 * 5
 
     score = round(
         skill_score
@@ -97,9 +97,23 @@ def calculate_readiness(profile: UserProfile, career: dict[str, Any]) -> dict[st
         + study_score
     )
     if profile.skills or profile.degree or profile.projects or profile.internships:
-        score = max(score, 32)
+        score = max(score, 34)
     if profile.skills and (profile.projects or profile.internships):
-        score = max(score, 44)
+        score = max(score, 42)
+    years = infer_profile_years(profile)
+    genuine_fresher = bool(profile.degree and profile.skills and (profile.projects or profile.certifications))
+    early_professional = 2 <= years <= 5 or (profile.internship_count >= 1 and profile.project_count >= 1 and len(profile.skills) >= 4)
+    senior_evidence = years >= 10 or (
+        profile.project_count >= 6
+        and profile.certification_count >= 3
+        and any(term in " ".join(profile.achievements).casefold() for term in ["led", "managed", "research", "publication", "patent", "impact"])
+    )
+    if genuine_fresher:
+        score = max(score, 66)
+    if early_professional:
+        score = max(score, 80 if skill_coverage >= 0.45 else 74)
+    if senior_evidence:
+        score = max(score, 89)
 
     positives = []
     improvements = []
@@ -124,7 +138,10 @@ def calculate_readiness(profile: UserProfile, career: dict[str, Any]) -> dict[st
     if missing:
         improvements.append("close priority skill gaps: " + ", ".join(missing[:4]))
 
-    final_score = max(0, min(score, 100))
+    cap = 93 if senior_evidence else 88
+    if skill_coverage < 0.5:
+        cap = min(cap, 82 if early_professional else 78)
+    final_score = max(28, min(score, cap))
     return {
         "score": final_score,
         "label": score_label(final_score),
@@ -140,36 +157,50 @@ def calculate_readiness(profile: UserProfile, career: dict[str, Any]) -> dict[st
 
 
 def calculate_success_probability(profile: UserProfile, readiness_score: int, missing_count: int) -> int:
-    del readiness_score
-    probability = 34
+    probability = 30
 
     if profile.career_goal:
-        probability += 7
+        probability += 5
     if profile.degree:
-        probability += 6
-    probability += min(len(profile.skills), 10) * 1.4
-    probability += min(profile.project_count, 4) * 4
-    probability += min(profile.internship_count, 3) * 5
-    probability += min(profile.certification_count, 3) * 3
-    probability += min(len([item for item in profile.achievements if item.strip()]), 3) * 2
+        probability += 4
+    probability += min(len(profile.skills), 10) * 1.0
+    probability += min(profile.project_count, 4) * 3
+    probability += min(profile.internship_count, 3) * 4
+    probability += min(profile.certification_count, 3) * 2
+    probability += min(len([item for item in profile.achievements if item.strip()]), 3) * 1.5
+    probability += min(readiness_score, 93) * 0.18
 
     if profile.weekly_study_hours >= 14:
-        probability += 12
-    elif profile.weekly_study_hours >= 8:
         probability += 8
+    elif profile.weekly_study_hours >= 8:
+        probability += 5
     elif profile.weekly_study_hours >= 3:
-        probability += 4
+        probability += 3
 
     if profile.gpa >= 8:
-        probability += 4
-    elif 6 <= profile.gpa < 8:
         probability += 2
+    elif 6 <= profile.gpa < 8:
+        probability += 1
 
-    probability -= min(missing_count, 6) * 1.5
+    probability -= min(missing_count, 7) * 1.8
     if profile.skills or profile.projects or profile.internships:
-        probability = max(probability, 38)
+        probability = max(probability, 40)
 
-    return max(20, min(round(probability), 96))
+    cap = 90 if readiness_score >= 88 and profile.project_count >= 3 and profile.internship_count >= 2 else 86
+    return max(32, min(round(probability), cap))
+
+
+def infer_profile_years(profile: UserProfile) -> int:
+    import re
+
+    text = " ".join(profile.internships + profile.achievements + profile.projects)
+    explicit = re.findall(r"\b(\d{1,2})\+?\s*(?:years|yrs)\b", text, flags=re.IGNORECASE)
+    if explicit:
+        return max(int(value) for value in explicit)
+    years = [int(year) for year in re.findall(r"\b(20\d{2}|19\d{2})\b", text)]
+    if len(years) >= 2:
+        return max(0, min(40, max(years) - min(years)))
+    return min(5, profile.internship_count)
 
 
 def career_matches(profile: UserProfile, careers: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:

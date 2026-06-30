@@ -15,7 +15,6 @@ from models.user import UserProfile
 from services.career_engine import (
     calculate_readiness,
     calculate_success_probability,
-    career_matches,
     fallback_action_plan,
     fallback_future,
     fallback_roadmap,
@@ -44,11 +43,11 @@ from services.resume_matcher import (
     compare_resume_to_job_description,
     is_github_relevant,
 )
+from services.scoring import calibrated_score, calibrated_ratio_score
 from services.ai_mentor import answer_mentor_question, build_mentor_context, get_mentor_question_library
 from services.career_knowledge import (
     build_transition_plan,
     career_search_suggestions,
-    discover_careers,
     get_career_knowledge,
     interview_preparation,
     learning_recommendations,
@@ -145,7 +144,6 @@ def render_dashboard_nav(has_resume: bool, has_github: bool) -> None:
     if has_resume:
         sections.insert(3, ("resume-analysis", "Resume Analysis"))
         sections.insert(4, ("resume-match", "Resume Match"))
-        sections.insert(5, ("career-recommendations", "Recommendations"))
     if has_github:
         sections.insert(6 if has_resume else 3, ("github-analysis", "GitHub Analysis"))
     links = "".join(f'<a href="#{section_id}">{label}</a>' for section_id, label in sections)
@@ -953,24 +951,96 @@ def render_github_cta() -> None:
             st.warning(st.session_state.github_error)
 
 
-def render_resume_career_recommendations(
+def selected_profession_specializations(career_name: str, career_knowledge: dict[str, object]) -> list[str]:
+    name = career_name.casefold()
+    domain = str(career_knowledge.get("domain", "")).casefold()
+    if "civil" in name:
+        return ["Structural Engineer", "Construction Engineer", "Site Engineer", "Highway Engineer", "Water Resources Engineer"]
+    if "ai" in name or "machine learning" in name:
+        return ["Machine Learning Engineer", "Computer Vision Engineer", "NLP Engineer", "MLOps Engineer", "Applied AI Engineer"]
+    if "data" in name:
+        return ["Data Analyst", "Data Scientist", "BI Analyst", "Analytics Engineer", "Machine Learning Analyst"]
+    if "software" in name or "developer" in name or domain == "technology":
+        return ["Backend Developer", "Frontend Developer", "Full-Stack Developer", "Platform Engineer", "Mobile Developer"]
+    if "finance" in name or "audit" in name or "account" in name:
+        return ["Audit Manager", "Finance Controller", "Tax Consultant", "Financial Analyst", "Risk Analyst"]
+    if "marketing" in name:
+        return ["SEO Specialist", "Performance Marketer", "Brand Strategist", "Content Marketer", "Growth Marketer"]
+    if "law" in name or "legal" in name:
+        return ["Corporate Lawyer", "Compliance Counsel", "Contract Specialist", "Legal Researcher", "Litigation Associate"]
+    if "doctor" in name or "medical" in name or "nurse" in name or "pharmac" in name or domain == "healthcare":
+        return ["Clinical Specialist", "Hospital Operations Specialist", "Public Health Specialist", "Clinical Research Associate", "Quality & Compliance Specialist"]
+    if "pilot" in name or "aviation" in name:
+        return ["Commercial Pilot", "Flight Instructor", "Airline First Officer", "Aviation Safety Officer", "Flight Operations Specialist"]
+    if "hotel" in name or "hospitality" in name:
+        return ["Hotel Operations Manager", "Guest Relations Manager", "Revenue Manager", "Event Operations Manager", "Food & Beverage Manager"]
+    if "journal" in name or "media" in name:
+        return ["Reporter", "Editor", "Digital Journalist", "Investigative Journalist", "Content Producer"]
+    if "design" in name or domain in {"creative", "architecture"}:
+        return ["Visual Designer", "UX Designer", "Product Designer", "Interior Designer", "Creative Lead"]
+    if "teacher" in name or "professor" in name or domain == "education":
+        return ["Subject Teacher", "Curriculum Designer", "Academic Coordinator", "Instructional Designer", "Education Consultant"]
+    return list(career_knowledge.get("career_path", []))[:5] or [career_name]
+
+
+def render_selected_career_overview(
     profile: UserProfile,
-    resume: ResumeParseResult | None,
-    careers: dict[str, dict],
+    readiness: dict[str, object],
+    probability: int,
+    country_intelligence: CountryCareerIntelligence,
+    career_knowledge: dict[str, object],
+    resume_match: ResumeMatchAnalysis | None,
+    coach_scores: dict[str, dict[str, object]],
+    roadmap_items: list[dict[str, object]],
 ) -> None:
-    if not resume:
-        return
-    recommendations = recommend_careers_for_profile(profile, resume, careers, limit=5)
-    if not recommendations:
-        return
-    st.subheader("Top Career Recommendations From Resume")
-    cols = st.columns(min(5, len(recommendations)))
-    for column, recommendation in zip(cols, recommendations):
-        with column:
-            with st.container(border=True):
-                st.metric(recommendation.career, f"{recommendation.fit_score}%")
-                st.caption(recommendation.domain)
-                st.write(recommendation.explanation)
+    st.subheader("Selected Career Overview")
+    st.caption("Focused coaching for the career you selected, with nearby specializations only.")
+    match_score = int(getattr(resume_match, "overall_match", readiness["score"]) or readiness["score"])
+    roadmap_progress = calibrated_ratio_score(
+        "roadmap_progress",
+        len(readiness.get("matched_skills", [])),
+        max(1, len(readiness.get("required_skills", []))),
+    )
+    overview_cols = st.columns(4)
+    with overview_cols[0]:
+        render_metric("Career Match Score", f"{match_score}%", "Fit for the selected career.")
+    with overview_cols[1]:
+        render_metric("Career Readiness", f"{readiness['score']}%", str(readiness.get("label", "")))
+    with overview_cols[2]:
+        render_metric("Market Readiness", f"{coach_scores['market_readiness']['score']}%", str(coach_scores["market_readiness"].get("label", "")))
+    with overview_cols[3]:
+        render_metric("Skill Coverage", f"{readiness.get('skill_coverage', 0)}%", "Matched role requirements.")
+
+    detail_cols = st.columns(3)
+    with detail_cols[0]:
+        st.markdown("**Required Skills**")
+        render_pills([str(item) for item in readiness.get("required_skills", [])[:8]])
+    with detail_cols[1]:
+        st.markdown("**Missing Skills**")
+        render_pills([str(item) for item in readiness.get("missing_skills", [])[:8]])
+    with detail_cols[2]:
+        st.markdown("**Selected-Profession Specializations**")
+        render_pills(selected_profession_specializations(profile.career_goal, career_knowledge))
+
+    market_cols = st.columns(4)
+    with market_cols[0]:
+        render_metric("Salary Information", country_intelligence.average_salary, f"Entry: {country_intelligence.entry_salary}")
+    with market_cols[1]:
+        render_metric("Job Demand", country_intelligence.demand_level, country_intelligence.hiring_trend)
+    with market_cols[2]:
+        render_metric("Growth Outlook", country_intelligence.market_growth, country_intelligence.future_outlook[:120])
+    with market_cols[3]:
+        render_metric("Roadmap Progress", f"{roadmap_progress}%", f"Next: {roadmap_items[0]['focus'] if roadmap_items else 'Build proof'}")
+
+    with st.container(border=True):
+        st.markdown("**AI Mentor Advice**")
+        advice = [
+            f"Stay focused on {profile.career_goal}; the dashboard is now evaluating this selected path rather than guessing unrelated careers.",
+            "Prioritize missing mandatory and domain skills before adding broad soft skills.",
+            f"Use the next roadmap milestone to create proof around {roadmap_items[0]['focus'] if roadmap_items else 'your highest-priority skill'}.",
+        ]
+        for item in advice:
+            st.write(f"- {item}")
 
 
 def render_project_summary_cards(repos: list[object]) -> None:
@@ -1054,9 +1124,9 @@ def probability_factors(profile: UserProfile, readiness: dict[str, object]) -> t
 def future_success_milestones(probability: int) -> list[tuple[str, int, str]]:
     return [
         ("Current", probability, "Based on current evidence and consistency."),
-        ("3 months", min(probability + 6, 97), "Complete the first roadmap project and close two priority gaps."),
-        ("6 months", min(probability + 12, 98), "Add portfolio proof, targeted applications, and interview practice."),
-        ("1 year", min(probability + 20, 99), "Combine experience, certifications, and a stronger body of work."),
+        ("3 months", min(probability + 4, 90), "Complete the first roadmap project and close two priority gaps."),
+        ("6 months", min(probability + 8, 91), "Add portfolio proof, targeted applications, and interview practice."),
+        ("1 year", min(probability + 13, 92), "Combine experience, certifications, and a stronger body of work."),
     ]
 
 
@@ -1066,41 +1136,48 @@ def calculate_ai_confidence(
     github_relevant: bool,
     github_analysis: GitHubAnalysis | None,
 ) -> dict[str, object]:
-    score = 38
+    score = 42
     positives = []
     improvements = []
     if profile.career_goal:
-        score += 10
+        score += 7
         positives.append("career goal is clearly selected")
     if profile.skills:
-        score += min(len(profile.skills), 10) * 2
+        score += min(len(profile.skills), 10) * 1.4
         positives.append("skill evidence is available")
     if resume:
         if resume.extraction_status == "Success":
-            score += 16
+            score += 11
             positives.append("resume extraction completed successfully")
         elif resume.extraction_status == "Partial":
-            score += 8
+            score += 5
             improvements.append("some resume fields need manual review")
         else:
             improvements.append("resume extraction failed")
         if resume.current_designation:
-            score += 5
+            score += 4
             positives.append("current designation was detected")
         if resume.detected_domain:
-            score += 4
+            score += 3
             positives.append(f"domain signal detected: {resume.detected_domain}")
     else:
         improvements.append("uploading a resume would improve AI confidence")
     if github_relevant:
         if github_analysis:
-            score += 8
+            score += 4
             positives.append("GitHub evidence is included for this technical path")
         else:
             improvements.append("GitHub is relevant for this path but not connected")
+    if resume and resume.extraction_status == "Success" and profile.skills and profile.project_count >= 2 and profile.internship_count:
+        cap = 93
+    elif resume or profile.skills:
+        cap = 86
+    else:
+        cap = 72
+    final_score = max(45, min(round(score), cap))
     return {
-        "score": max(20, min(round(score), 98)),
-        "label": score_label(max(20, min(round(score), 98))),
+        "score": final_score,
+        "label": score_label(final_score),
         "positives": positives or ["enough profile context exists to begin"],
         "improvements": improvements or ["no major confidence gaps detected"],
         "why": "AI confidence measures data quality, profile completeness, career clarity, extraction quality, and relevant portfolio availability.",
@@ -1132,7 +1209,7 @@ def calculate_portfolio_strength(
     tech_domain = any(term in domain for term in ["software", "engineering", "data", "cybersecurity", "cloud", "technology", "ai"])
     if tech_domain:
         if github_analysis:
-            score += min(int(github_analysis.github_score), 100) * 0.18
+            score += calibrated_score("github", int(github_analysis.github_score)) * 0.18
             positives.append("GitHub repositories are evaluated for this technical path")
         else:
             improvements.append("add GitHub or production project links for stronger technical proof")
@@ -1141,7 +1218,8 @@ def calculate_portfolio_strength(
         positives.append("professional profile or portfolio link is available")
     if requirements:
         improvements.append("best portfolio evidence: " + ", ".join(str(item) for item in requirements[:3]))
-    final_score = max(25, min(round(score), 96))
+    cap = 92 if profile.project_count >= 4 and profile.internship_count >= 2 else 86
+    final_score = max(30, min(round(score), cap))
     return {
         "score": final_score,
         "label": score_label(final_score),
@@ -1158,31 +1236,31 @@ def calculate_market_readiness(
     portfolio_strength: dict[str, object],
 ) -> dict[str, object]:
     demand = str(country_intelligence.demand_level).casefold()
-    score = 32
+    score = 30
     positives = []
     improvements = []
     if "very high" in demand:
-        score += 18
+        score += 12
         positives.append("market demand is very high")
     elif "high" in demand:
-        score += 14
+        score += 9
         positives.append("market demand is high")
     elif "medium" in demand:
-        score += 9
+        score += 5
         positives.append("market demand is moderate")
-    score += min(int(readiness.get("skill_coverage", 0)), 100) * 0.22
-    score += min(int(portfolio_strength["score"]), 100) * 0.18
+    score += calibrated_score("technical_skills", int(readiness.get("skill_coverage", 0))) * 0.20
+    score += calibrated_score("portfolio_strength", int(portfolio_strength["score"])) * 0.15
     if profile.internship_count:
-        score += 8
+        score += 6
         positives.append("experience improves job-market signal")
     else:
         improvements.append("add internship, field work, freelance, or practical experience")
     if profile.certification_count:
-        score += 5
+        score += 3
         positives.append("certifications support market credibility")
     if readiness.get("missing_skills"):
         improvements.append("close market-critical skills: " + ", ".join(str(item) for item in readiness["missing_skills"][:3]))
-    final_score = max(25, min(round(score), 97))
+    final_score = max(32, min(round(score), 90))
     return {
         "score": final_score,
         "label": score_label(final_score),
@@ -1557,21 +1635,20 @@ def render_universal_career_intelligence(
             for insight in list(career_knowledge.get("industry_insights", []))[:3]:
                 st.write(f"- {insight}")
 
-    discovery_query = st.text_input(
-        "Career discovery from interests",
-        value=st.session_state.get("career_discovery_query", ""),
-        placeholder="Example: I enjoy biology and coding",
-    )
-    st.session_state.career_discovery_query = discovery_query
-    recommendations = discover_careers(discovery_query or profile.career_goal, profile)
-    st.markdown("**Career Discovery Recommendations**")
-    rec_cols = st.columns(min(4, max(1, len(recommendations))))
-    for column, recommendation in zip(rec_cols, recommendations):
-        with column:
-            with st.container(border=True):
-                st.metric(recommendation.career, f"{recommendation.fit_score}%")
-                st.caption(recommendation.domain)
-                st.write(recommendation.explanation)
+    with st.expander("Selected Career Focus", expanded=True):
+        st.caption("Career Twin AI now stays focused on your selected career path and its direct specializations.")
+        focus_cols = st.columns(2)
+        with focus_cols[0]:
+            st.markdown("**Selected Profession Specializations**")
+            render_pills(selected_profession_specializations(profile.career_goal, career_knowledge))
+        with focus_cols[1]:
+            st.markdown("**Why This Path Is Being Evaluated**")
+            focus_reasons = [
+                f"Selected target: {profile.career_goal}",
+                f"Detected domain: {domain}",
+                "Recommendations are limited to specializations within this profession.",
+            ]
+            render_pills(focus_reasons)
 
     transition_background = st.text_input(
         "Career transition background",
@@ -1720,18 +1797,18 @@ def digital_twin_stages(
         (missing_skills + ["Architecture", "Strategy", "Leadership", "Mentoring", "Market Expertise"])[:7],
     ]
     confidence_scores = [
-        max(10, min(readiness["score"], 100)),
-        max(20, min(readiness["score"] + 18, 100)),
-        max(35, min(probability, 100)),
-        max(45, min(probability + 12, 100)),
-        max(55, min(probability + 20, 100)),
+        max(10, calibrated_score("ai_confidence", readiness["score"])),
+        max(20, calibrated_score("ai_confidence", readiness["score"] + 8)),
+        max(35, calibrated_score("ai_confidence", probability)),
+        max(45, calibrated_score("ai_confidence", probability + 6)),
+        max(55, calibrated_score("ai_confidence", probability + 10)),
     ]
     probability_scores = [
-        max(5, min(probability - 20, 100)),
-        max(10, min(probability - 5, 100)),
-        max(20, min(probability, 100)),
-        max(25, min(probability + 8, 100)),
-        max(30, min(probability + 15, 100)),
+        max(5, calibrated_score("success_probability", probability - 20)),
+        max(10, calibrated_score("success_probability", probability - 5)),
+        max(20, calibrated_score("success_probability", probability)),
+        max(25, calibrated_score("success_probability", probability + 5)),
+        max(30, calibrated_score("success_probability", probability + 9)),
     ]
     salary_ranges = projected_salary_ranges(career_goal, country_intelligence)
 
@@ -2157,8 +2234,6 @@ def main() -> None:
     readiness = calculate_readiness(profile, selected_career)
     country_intelligence = get_country_career_intelligence(profile.career_goal, profile.target_country, selected_career)
     probability = calculate_success_probability(profile, readiness["score"], len(readiness["missing_skills"]))
-    matches = career_matches(profile, careers)
-    top_matches = matches[:4]
     resume = st.session_state.get("resume_parse")
     github_analysis = st.session_state.get("github_analysis")
     roadmap_items = fallback_roadmap(
@@ -2210,6 +2285,19 @@ def main() -> None:
     )
     render_ai_mentor_chat(mentor_context)
 
+    st.divider()
+    section_anchor("career-match")
+    render_selected_career_overview(
+        profile,
+        readiness,
+        probability,
+        country_intelligence,
+        career_knowledge,
+        resume_match,
+        coach_scores,
+        roadmap_items,
+    )
+
     report = build_dashboard_report(
         profile,
         readiness,
@@ -2259,9 +2347,6 @@ def main() -> None:
         section_anchor("resume-analysis")
         render_resume_insights(resume, readiness["missing_skills"])
         st.divider()
-        section_anchor("career-recommendations")
-        render_resume_career_recommendations(profile, resume, careers)
-        st.divider()
 
     if resume and resume_match:
         section_anchor("resume-match")
@@ -2286,19 +2371,6 @@ def main() -> None:
         st.subheader("Missing Skills")
         st.caption("Prioritize these to increase readiness fastest.")
         render_pills(readiness["missing_skills"])
-
-    st.divider()
-
-    section_anchor("career-match")
-    st.subheader("Career Match Engine")
-    match_cols = st.columns(4)
-    for column, match in zip(match_cols, top_matches):
-        with column:
-            with st.container(border=True):
-                st.metric(match["career"], f"{match['probability']}%")
-                st.caption(f"Readiness {match['score']}%")
-                st.progress(match["probability"] / 100)
-                st.caption("Why: " + career_match_reason(match))
 
     st.divider()
 

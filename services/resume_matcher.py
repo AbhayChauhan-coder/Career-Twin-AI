@@ -7,6 +7,7 @@ from typing import Any
 from models.user import UserProfile
 from services.github_analyzer import GitHubAnalysis
 from services.resume_parser import ResumeParseResult, build_skill_bank, detect_skills
+from services.scoring import calibrated_ratio_score, calibrated_score
 
 
 STOP_WORDS = {
@@ -68,17 +69,17 @@ def analyze_resume_match(
     missing_required = [skill for skill in required_skills if skill not in matched_required]
     required_skill_set = set(canonical_term(skill) for skill in required_skills)
 
-    technical = percent(len(matched_required), len(required_skill_set))
+    technical = calibrated_ratio_score("technical_skills", len(matched_required), len(required_skill_set))
     soft = soft_skill_score(resume)
-    projects = min(len(resume.structured_projects or resume.projects), 3) / 3 * 100
+    projects = calibrated_ratio_score("projects", len(resume.structured_projects or resume.projects), 4)
     experience_count = len(resume.structured_experience or resume.experience)
-    experience = min(experience_count, 3) / 3 * 100
+    experience = calibrated_ratio_score("experience", experience_count, 4)
     has_professional_experience = experience_count > 0 and not all("intern" in item.casefold() for item in resume.experience)
-    internships: int | str = "N/A" if has_professional_experience else (100 if any("intern" in item.casefold() for item in resume.experience) else 0)
-    education = 100 if resume.degree or resume.education else 0
-    certifications = min(len(resume.structured_certifications or resume.certifications), 2) / 2 * 100
+    internships: int | str = "N/A" if has_professional_experience else (88 if any("intern" in item.casefold() for item in resume.experience) else 0)
+    education = calibrated_score("education", 86 if resume.degree or resume.education else 0)
+    certifications = calibrated_ratio_score("certifications", len(resume.structured_certifications or resume.certifications), 3)
     github_relevant = is_github_relevant(career_definition)
-    github: int | str = github_analysis.github_score if github_analysis and github_relevant else ("N/A" if not github_relevant else 0)
+    github: int | str = calibrated_score("github", github_analysis.github_score) if github_analysis and github_relevant else ("N/A" if not github_relevant else 0)
     ats = resume.ats_readiness_score
     industry = resume.industry_readiness_score
 
@@ -116,7 +117,7 @@ def analyze_resume_match(
     suggestions = build_suggestions(weighted_scores, critical, important, nice, profile.career_goal)
 
     return ResumeMatchAnalysis(
-        overall_match=max(0, min(overall, 100)),
+        overall_match=calibrated_score("career_match", overall),
         weighted_scores=weighted_scores,
         strengths=strengths,
         weaknesses=weaknesses,
@@ -227,7 +228,7 @@ def percent(numerator: int, denominator: int) -> int:
 
 def soft_skill_score(resume: ResumeParseResult) -> int:
     soft_skills = resume.skill_categories.get("Soft Skills", [])
-    return min(len(soft_skills), 4) * 25
+    return calibrated_ratio_score("soft_skills", len(soft_skills), 4)
 
 
 def split_missing_skills(missing_skills: list[str]) -> tuple[list[str], list[str], list[str]]:
@@ -305,7 +306,7 @@ def semantic_overlap(resume_text: str, jd_text: str) -> int:
     jd_terms = meaningful_terms(jd_text)
     if not jd_terms:
         return 0
-    return percent(len(resume_terms & jd_terms), len(jd_terms))
+    return calibrated_score("career_match", percent(len(resume_terms & jd_terms), len(jd_terms)))
 
 
 def meaningful_terms(text: str) -> set[str]:
@@ -316,7 +317,7 @@ def meaningful_terms(text: str) -> set[str]:
 def section_match(resume_values: list[str], jd_text: str, jd_markers: list[str]) -> int:
     jd_lower = jd_text.casefold()
     if not any(marker in jd_lower for marker in jd_markers):
-        return 100
+        return 82
     resume_text = " ".join(value for value in resume_values if value).casefold()
     if not resume_text:
         return 0
