@@ -569,6 +569,348 @@ ADDITIONAL_COUNTRY_DATA = {
 
 
 COUNTRY_MARKET_DATA.update(ADDITIONAL_COUNTRY_DATA)
+
+
+REGIONAL_COUNTRY_GROUPS = {
+    "North America": ["Mexico", "Jamaica", "Dominican Republic", "Trinidad and Tobago"],
+    "Latin America": [
+        "Brazil",
+        "Argentina",
+        "Chile",
+        "Colombia",
+        "Peru",
+        "Uruguay",
+        "Costa Rica",
+        "Panama",
+        "Ecuador",
+        "Bolivia",
+        "Paraguay",
+        "Guatemala",
+        "El Salvador",
+    ],
+    "Europe": [
+        "Czech Republic",
+        "Hungary",
+        "Romania",
+        "Greece",
+        "Luxembourg",
+        "Iceland",
+        "Estonia",
+        "Latvia",
+        "Lithuania",
+        "Slovakia",
+        "Slovenia",
+        "Croatia",
+        "Bulgaria",
+        "Serbia",
+        "Turkey",
+        "Malta",
+        "Cyprus",
+        "Ukraine",
+        "Georgia",
+        "Armenia",
+    ],
+    "Middle East": ["Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman", "Israel", "Jordan", "Lebanon"],
+    "Africa": [
+        "South Africa",
+        "Egypt",
+        "Nigeria",
+        "Kenya",
+        "Morocco",
+        "Ghana",
+        "Rwanda",
+        "Ethiopia",
+        "Tanzania",
+        "Uganda",
+        "Senegal",
+        "Tunisia",
+        "Algeria",
+        "Botswana",
+        "Namibia",
+        "Mauritius",
+    ],
+    "Asia": [
+        "China",
+        "Hong Kong",
+        "Taiwan",
+        "Malaysia",
+        "Thailand",
+        "Indonesia",
+        "Vietnam",
+        "Philippines",
+        "Sri Lanka",
+        "Nepal",
+        "Myanmar",
+        "Cambodia",
+        "Laos",
+        "Mongolia",
+        "Kazakhstan",
+        "Uzbekistan",
+    ],
+    "Oceania": ["Fiji", "Papua New Guinea", "Samoa"],
+}
+
+
+REGIONAL_MARKET_TEMPLATES = {
+    "North America": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "High",
+        "remote_jobs": "High",
+        "cost_of_living": "Medium to High",
+        "language_requirements": ["English helpful", "Spanish helpful in Mexico"],
+        "top_hiring_companies": ["multinational employers", "banks", "technology firms", "healthcare networks", "manufacturing groups"],
+        "interview_process": ["Recruiter screen", "Role interview", "Practical task or case", "Final manager interview"],
+        "future_demand": "Demand is strongest in digital transformation, healthcare, finance, manufacturing, logistics, and professional services.",
+        "certifications": ["Role-specific professional certificate", "Project Management", "Digital tools certification"],
+        "programming_languages": ["Python", "SQL", "JavaScript"],
+        "frameworks": ["Power BI", "Cloud tools", "Role-specific platforms"],
+        "country_skills": ["English Communication", "Portfolio Evidence", "Local Market Awareness"],
+        "major_industries": ["Technology", "Healthcare", "Finance", "Manufacturing", "Logistics"],
+    },
+    "Latin America": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "Medium to High",
+        "remote_jobs": "High",
+        "cost_of_living": "Medium",
+        "language_requirements": ["Spanish or Portuguese usually required", "English improves remote roles"],
+        "top_hiring_companies": ["Mercado Libre", "Nubank", "regional banks", "consulting firms", "healthcare groups"],
+        "interview_process": ["Recruiter screen", "Role interview", "Portfolio or case review", "Final interview"],
+        "future_demand": "Nearshore work, fintech, healthcare, digital commerce, education, and infrastructure are expanding opportunities.",
+        "certifications": ["Role-specific professional certificate", "Google Career Certificate", "Project Management"],
+        "programming_languages": ["Python", "SQL", "JavaScript"],
+        "frameworks": ["Power BI", "CRM tools", "Role-specific platforms"],
+        "country_skills": ["Local Language", "English Communication", "Remote Collaboration"],
+        "major_industries": ["Fintech", "E-commerce", "Healthcare", "Education", "Infrastructure"],
+    },
+    "Europe": {
+        "currency": "EUR",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "High",
+        "remote_jobs": "High",
+        "cost_of_living": "Medium to High",
+        "language_requirements": ["English professional fluency", "Local language improves non-technical roles"],
+        "top_hiring_companies": ["EU employers", "banks", "manufacturers", "consulting firms", "public institutions"],
+        "interview_process": ["Recruiter screen", "Role task", "Team interview", "Culture interview"],
+        "future_demand": "Demand is strong in healthcare, engineering, public services, sustainability, finance, AI, and regulated industries.",
+        "certifications": ["Role-specific EU credential", "Language certificate", "Project Management"],
+        "programming_languages": ["Python", "SQL", "Java", "JavaScript"],
+        "frameworks": ["Power BI", "Cloud tools", "Role-specific platforms"],
+        "country_skills": ["EU Work Culture", "Documentation", "Local Language"],
+        "major_industries": ["Engineering", "Healthcare", "Finance", "Public Sector", "Sustainability"],
+    },
+    "Middle East": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "Very High",
+        "remote_jobs": "Medium",
+        "cost_of_living": "Medium to High",
+        "language_requirements": ["English professional fluency", "Arabic helpful for public-facing roles"],
+        "top_hiring_companies": ["airlines", "energy companies", "construction firms", "banks", "government entities"],
+        "interview_process": ["Recruiter screen", "Manager interview", "Case or portfolio round", "HR discussion"],
+        "future_demand": "Tourism, aviation, energy, construction, healthcare, finance, digital government, and AI investment drive growth.",
+        "certifications": ["PMP", "Role-specific license", "Professional safety or compliance credential"],
+        "programming_languages": ["Python", "SQL", "JavaScript"],
+        "frameworks": ["Power BI", "CRM tools", "Role-specific platforms"],
+        "country_skills": ["Client Communication", "Gulf Market Awareness", "Compliance"],
+        "major_industries": ["Energy", "Aviation", "Construction", "Hospitality", "Healthcare"],
+    },
+    "Africa": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "High",
+        "remote_jobs": "Medium",
+        "cost_of_living": "Low to Medium",
+        "language_requirements": ["English or French depending on country", "Local language helpful"],
+        "top_hiring_companies": ["banks", "telecom companies", "NGOs", "healthcare groups", "government agencies"],
+        "interview_process": ["Resume screen", "Role interview", "Scenario or case round", "Final interview"],
+        "future_demand": "Healthcare, education, public administration, telecom, fintech, agriculture, and infrastructure remain important growth areas.",
+        "certifications": ["Role-specific credential", "Project Management", "Digital skills certificate"],
+        "programming_languages": ["Python", "SQL", "JavaScript"],
+        "frameworks": ["Power BI", "Mobile tools", "Role-specific platforms"],
+        "country_skills": ["Local Context", "Communication", "Practical Field Experience"],
+        "major_industries": ["Telecom", "Healthcare", "Finance", "Agriculture", "Public Sector"],
+    },
+    "Asia": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "Very High",
+        "remote_jobs": "Medium",
+        "cost_of_living": "Low to High by city",
+        "language_requirements": ["English helpful", "Local language often required for public-facing roles"],
+        "top_hiring_companies": ["technology firms", "manufacturers", "banks", "healthcare groups", "education providers"],
+        "interview_process": ["Resume screen", "Role assessment", "Manager interview", "HR interview"],
+        "future_demand": "Manufacturing, digital services, healthcare, finance, education, logistics, and AI adoption are expanding career opportunities.",
+        "certifications": ["Role-specific professional certificate", "Digital tools certification", "Project Management"],
+        "programming_languages": ["Python", "SQL", "JavaScript", "Java"],
+        "frameworks": ["Power BI", "Cloud tools", "Role-specific platforms"],
+        "country_skills": ["Local Language", "Documentation", "Practical Portfolio"],
+        "major_industries": ["Technology", "Manufacturing", "Finance", "Healthcare", "Education"],
+    },
+    "Oceania": {
+        "currency": "USD",
+        "salary_suffix": "k",
+        "visa_difficulty": "Medium",
+        "market_growth": "Medium",
+        "remote_jobs": "Medium",
+        "cost_of_living": "Medium",
+        "language_requirements": ["English professional fluency"],
+        "top_hiring_companies": ["hospitality employers", "public services", "education providers", "healthcare groups"],
+        "interview_process": ["Resume screen", "Role interview", "Practical discussion", "Final interview"],
+        "future_demand": "Hospitality, healthcare, education, tourism, public services, and remote professional work create opportunities.",
+        "certifications": ["Role-specific credential", "Hospitality or safety certificate", "Project Management"],
+        "programming_languages": ["Python", "SQL"],
+        "frameworks": ["Office tools", "Role-specific platforms"],
+        "country_skills": ["English Communication", "Service Orientation", "Local Market Awareness"],
+        "major_industries": ["Tourism", "Healthcare", "Education", "Public Services", "Hospitality"],
+    },
+}
+
+
+COUNTRY_CURRENCY_OVERRIDES = {
+    "Mexico": "MXN",
+    "Brazil": "BRL",
+    "Argentina": "ARS",
+    "Chile": "CLP",
+    "Colombia": "COP",
+    "Peru": "PEN",
+    "Uruguay": "UYU",
+    "Costa Rica": "CRC",
+    "Panama": "PAB",
+    "Jamaica": "JMD",
+    "Dominican Republic": "DOP",
+    "Trinidad and Tobago": "TTD",
+    "Ecuador": "USD",
+    "Bolivia": "BOB",
+    "Paraguay": "PYG",
+    "Guatemala": "GTQ",
+    "El Salvador": "USD",
+    "Czech Republic": "CZK",
+    "Hungary": "HUF",
+    "Romania": "RON",
+    "Greece": "EUR",
+    "Luxembourg": "EUR",
+    "Iceland": "ISK",
+    "Estonia": "EUR",
+    "Latvia": "EUR",
+    "Lithuania": "EUR",
+    "Slovakia": "EUR",
+    "Slovenia": "EUR",
+    "Croatia": "EUR",
+    "Bulgaria": "BGN",
+    "Serbia": "RSD",
+    "Turkey": "TRY",
+    "Malta": "EUR",
+    "Cyprus": "EUR",
+    "Ukraine": "UAH",
+    "Georgia": "GEL",
+    "Armenia": "AMD",
+    "Saudi Arabia": "SAR",
+    "Qatar": "QAR",
+    "Kuwait": "KWD",
+    "Bahrain": "BHD",
+    "Oman": "OMR",
+    "Israel": "ILS",
+    "Jordan": "JOD",
+    "Lebanon": "LBP",
+    "South Africa": "ZAR",
+    "Egypt": "EGP",
+    "Nigeria": "NGN",
+    "Kenya": "KES",
+    "Morocco": "MAD",
+    "Ghana": "GHS",
+    "Rwanda": "RWF",
+    "Ethiopia": "ETB",
+    "Tanzania": "TZS",
+    "Uganda": "UGX",
+    "Senegal": "XOF",
+    "Tunisia": "TND",
+    "Algeria": "DZD",
+    "Botswana": "BWP",
+    "Namibia": "NAD",
+    "Mauritius": "MUR",
+    "China": "CNY",
+    "Hong Kong": "HKD",
+    "Taiwan": "TWD",
+    "Malaysia": "MYR",
+    "Thailand": "THB",
+    "Indonesia": "IDR",
+    "Vietnam": "VND",
+    "Philippines": "PHP",
+    "Pakistan": "PKR",
+    "Bangladesh": "BDT",
+    "Sri Lanka": "LKR",
+    "Nepal": "NPR",
+    "Myanmar": "MMK",
+    "Cambodia": "KHR",
+    "Laos": "LAK",
+    "Mongolia": "MNT",
+    "Kazakhstan": "KZT",
+    "Uzbekistan": "UZS",
+    "Fiji": "FJD",
+    "Papua New Guinea": "PGK",
+    "Samoa": "WST",
+}
+
+
+REGIONAL_CATEGORY_MARKETS = {
+    "North America": DEFAULT_CATEGORY_MARKETS,
+    "Latin America": {
+        "Finance": {"demand": "High", "entry": "18-30", "mid": "35-58", "senior": "65-105"},
+        "Marketing": {"demand": "High", "entry": "16-26", "mid": "30-48", "senior": "55-90"},
+        "Law": {"demand": "Medium", "entry": "18-32", "mid": "38-65", "senior": "75-120"},
+        "Healthcare": {"demand": "High", "entry": "16-28", "mid": "32-55", "senior": "60-100"},
+        "Education": {"demand": "Medium", "entry": "14-24", "mid": "26-42", "senior": "48-75"},
+        "Engineering": {"demand": "High", "entry": "18-32", "mid": "38-62", "senior": "70-110"},
+        "Government": {"demand": "Medium", "entry": "14-24", "mid": "28-48", "senior": "55-90"},
+        "General": {"demand": "Medium", "entry": "15-25", "mid": "30-50", "senior": "58-95"},
+    },
+    "Europe": DEFAULT_CATEGORY_MARKETS,
+    "Middle East": DEFAULT_CATEGORY_MARKETS,
+    "Africa": {
+        "Finance": {"demand": "High", "entry": "12-22", "mid": "25-42", "senior": "50-85"},
+        "Marketing": {"demand": "Medium", "entry": "10-18", "mid": "22-36", "senior": "42-70"},
+        "Law": {"demand": "Medium", "entry": "12-22", "mid": "25-45", "senior": "52-90"},
+        "Healthcare": {"demand": "High", "entry": "10-20", "mid": "24-42", "senior": "48-82"},
+        "Education": {"demand": "High", "entry": "9-16", "mid": "18-32", "senior": "36-60"},
+        "Engineering": {"demand": "High", "entry": "12-24", "mid": "28-48", "senior": "55-95"},
+        "Government": {"demand": "Medium", "entry": "10-18", "mid": "22-38", "senior": "45-75"},
+        "General": {"demand": "Medium", "entry": "10-18", "mid": "22-38", "senior": "45-75"},
+    },
+    "Asia": {
+        "Finance": {"demand": "High", "entry": "12-25", "mid": "28-55", "senior": "65-120"},
+        "Marketing": {"demand": "High", "entry": "10-22", "mid": "25-48", "senior": "55-100"},
+        "Law": {"demand": "Medium", "entry": "12-26", "mid": "30-60", "senior": "70-130"},
+        "Healthcare": {"demand": "High", "entry": "10-22", "mid": "26-50", "senior": "58-110"},
+        "Education": {"demand": "Medium", "entry": "8-18", "mid": "20-38", "senior": "45-80"},
+        "Engineering": {"demand": "High", "entry": "12-25", "mid": "30-60", "senior": "70-130"},
+        "Government": {"demand": "Medium", "entry": "8-18", "mid": "20-40", "senior": "48-90"},
+        "General": {"demand": "Medium", "entry": "10-20", "mid": "24-45", "senior": "52-95"},
+    },
+    "Oceania": DEFAULT_CATEGORY_MARKETS,
+}
+
+
+def register_global_country_data() -> None:
+    for region, countries in REGIONAL_COUNTRY_GROUPS.items():
+        template = REGIONAL_MARKET_TEMPLATES[region]
+        for country in countries:
+            if country in COUNTRY_MARKET_DATA:
+                continue
+            country_data = dict(template)
+            country_data["currency"] = COUNTRY_CURRENCY_OVERRIDES.get(country, template["currency"])
+            country_data["categories"] = dict(REGIONAL_CATEGORY_MARKETS.get(region, DEFAULT_CATEGORY_MARKETS))
+            COUNTRY_MARKET_DATA[country] = country_data
+
+
+register_global_country_data()
 COUNTRY_CATEGORY_DEFAULTS = {
     "India": {
         "Finance": {"demand": "High", "entry": "4-8", "mid": "10-18", "senior": "22-45"},
@@ -610,23 +952,35 @@ for _country_name, _country_data in COUNTRY_MARKET_DATA.items():
     if _country_name in COUNTRY_CATEGORY_DEFAULTS:
         _country_data["categories"].update(COUNTRY_CATEGORY_DEFAULTS[_country_name])
 
+SUPPORTED_COUNTRIES = sorted(COUNTRY_MARKET_DATA)
+
 
 @dataclass
 class CountryCareerIntelligence:
     country: str
     career: str
+    flag: str
+    currency: str
     demand_level: str
     entry_salary: str
     mid_level_salary: str
     senior_salary: str
+    average_salary: str
     remote_jobs: str
+    remote_work_availability: str
     top_hiring_companies: list[str]
+    major_hiring_industries: list[str]
     most_required_skills: list[str]
     most_valuable_certifications: list[str]
     most_valuable_programming_languages: list[str]
     most_valuable_frameworks: list[str]
     visa_difficulty: str
+    visa_overview: str
     market_growth: str
+    hiring_trend: str
+    degree_requirements: list[str]
+    career_progression: list[str]
+    future_outlook: str
     interview_process: list[str]
     future_demand: str
     cost_of_living: str
@@ -672,18 +1026,28 @@ def get_country_career_intelligence(
     intelligence = CountryCareerIntelligence(
         country=selected_country,
         career=career_name,
+        flag=country_flag(selected_country),
+        currency=country_data["currency"],
         demand_level=market["demand"],
         entry_salary=format_salary(country_data, market["entry"]),
         mid_level_salary=format_salary(country_data, market["mid"]),
         senior_salary=format_salary(country_data, market["senior"]),
+        average_salary=format_salary(country_data, market["mid"]),
         remote_jobs=country_data["remote_jobs"],
+        remote_work_availability=country_data["remote_jobs"],
         top_hiring_companies=top_companies,
+        major_hiring_industries=major_hiring_industries(country_data, domain, category),
         most_required_skills=most_required_skills,
         most_valuable_certifications=certifications,
         most_valuable_programming_languages=market_profile["programming_languages"] if is_technology else [],
         most_valuable_frameworks=frameworks if is_technology else market_profile["frameworks"],
         visa_difficulty=country_data["visa_difficulty"],
+        visa_overview=visa_overview(selected_country, country_data["visa_difficulty"], domain),
         market_growth=country_data["market_growth"],
+        hiring_trend=hiring_trend(market["demand"], country_data["market_growth"]),
+        degree_requirements=list(career_definition.get("degree_requirements", []))[:6],
+        career_progression=list(career_definition.get("career_path", []))[:6],
+        future_outlook=future_demand,
         interview_process=interview_process,
         future_demand=future_demand,
         cost_of_living=country_data.get("cost_of_living", "Medium"),
@@ -771,6 +1135,143 @@ def salary_midpoint(value: str) -> int:
     if len(numbers) >= 2:
         return round(sum(numbers[:2]) / 2)
     return numbers[0] if numbers else 0
+
+
+def country_flag(country: str) -> str:
+    flags = {
+        "India": "IN",
+        "Germany": "DE",
+        "USA": "US",
+        "Canada": "CA",
+        "Australia": "AU",
+        "United Kingdom": "GB",
+        "Singapore": "SG",
+        "UAE": "AE",
+        "Japan": "JP",
+        "France": "FR",
+        "Netherlands": "NL",
+        "Sweden": "SE",
+        "Switzerland": "CH",
+        "New Zealand": "NZ",
+        "South Korea": "KR",
+        "Italy": "IT",
+        "Spain": "ES",
+        "Belgium": "BE",
+        "Norway": "NO",
+        "Denmark": "DK",
+        "Finland": "FI",
+        "Ireland": "IE",
+        "Austria": "AT",
+        "Portugal": "PT",
+        "Poland": "PL",
+        "Mexico": "MX",
+        "Brazil": "BR",
+        "Argentina": "AR",
+        "Chile": "CL",
+        "Colombia": "CO",
+        "Peru": "PE",
+        "Uruguay": "UY",
+        "Costa Rica": "CR",
+        "Panama": "PA",
+        "Czech Republic": "CZ",
+        "Hungary": "HU",
+        "Romania": "RO",
+        "Greece": "GR",
+        "Luxembourg": "LU",
+        "Iceland": "IS",
+        "Estonia": "EE",
+        "Latvia": "LV",
+        "Lithuania": "LT",
+        "Slovakia": "SK",
+        "Slovenia": "SI",
+        "Croatia": "HR",
+        "Bulgaria": "BG",
+        "Serbia": "RS",
+        "Turkey": "TR",
+        "Saudi Arabia": "SA",
+        "Qatar": "QA",
+        "Kuwait": "KW",
+        "Bahrain": "BH",
+        "Oman": "OM",
+        "Israel": "IL",
+        "South Africa": "ZA",
+        "Egypt": "EG",
+        "Nigeria": "NG",
+        "Kenya": "KE",
+        "Morocco": "MA",
+        "Ghana": "GH",
+        "Rwanda": "RW",
+        "Ethiopia": "ET",
+        "China": "CN",
+        "Hong Kong": "HK",
+        "Taiwan": "TW",
+        "Malaysia": "MY",
+        "Thailand": "TH",
+        "Indonesia": "ID",
+        "Vietnam": "VN",
+        "Philippines": "PH",
+        "Pakistan": "PK",
+        "Bangladesh": "BD",
+        "Sri Lanka": "LK",
+        "Nepal": "NP",
+        "Fiji": "FJ",
+    }
+    return flag_emoji(flags.get(country, country[:2].upper()))
+
+
+def flag_emoji(country_code: str) -> str:
+    if len(country_code) != 2 or not country_code.isalpha():
+        return country_code
+    base = 127397
+    return "".join(chr(base + ord(char.upper())) for char in country_code)
+
+
+def visa_overview(country: str, difficulty: str, domain: str) -> str:
+    if difficulty == "High":
+        return f"{country} usually requires strong employer sponsorship, documentation, and clear role fit for {domain.lower()} careers."
+    if difficulty == "Medium":
+        return f"{country} has workable visa or permit routes, but local rules, documents, and employer readiness should be checked before applying."
+    return f"{country} is generally straightforward for local candidates; international applicants should still verify work-permit rules."
+
+
+def hiring_trend(demand: str, market_growth: str) -> str:
+    if demand == "Very High" or market_growth == "Very High":
+        return "Expanding"
+    if demand == "High" or market_growth == "High":
+        return "Growing"
+    if demand == "Medium":
+        return "Selective"
+    return "Niche"
+
+
+def major_hiring_industries(country_data: dict[str, Any], domain: str, category: str) -> list[str]:
+    base = list(country_data.get("major_industries", []))
+    domain_industries = {
+        "Technology": ["Software Products", "Cloud Services", "Cybersecurity", "Fintech"],
+        "Healthcare": ["Hospitals", "Clinics", "Pharmaceuticals", "Public Health"],
+        "Finance": ["Banking", "Audit", "Investment", "Insurance"],
+        "Law": ["Law Firms", "Corporate Legal", "Compliance", "Public Sector"],
+        "Creative": ["Media", "Design Studios", "Advertising", "Entertainment"],
+        "Hospitality": ["Hotels", "Tourism", "Airlines", "Events"],
+        "Education": ["Schools", "Universities", "EdTech", "Training Institutes"],
+        "Engineering": ["Manufacturing", "Construction", "Energy", "Infrastructure"],
+        "Architecture": ["Architecture Firms", "Interior Design Studios", "Construction", "Real Estate"],
+        "Government": ["Public Administration", "Policy", "PSUs", "Development Agencies"],
+        "Business": ["Consulting", "Retail", "Operations", "Logistics"],
+        "Entrepreneurship": ["Startups", "Small Business", "Venture Studios", "Incubators"],
+        "Science": ["Research Labs", "Universities", "Biotechnology", "Environmental Research"],
+        "Agriculture": ["Agri Business", "Food Technology", "Sustainability", "Supply Chain"],
+        "Marketing": ["Digital Agencies", "Consumer Brands", "E-commerce", "Media"],
+    }
+    category_industries = {
+        "AI": ["AI Products", "Research Labs", "Enterprise Automation"],
+        "Data": ["Analytics", "Consulting", "Finance", "Healthcare"],
+        "Cybersecurity": ["Security Services", "Banking", "Cloud Providers"],
+        "Cloud": ["Cloud Providers", "Managed Services", "Enterprise IT"],
+        "Marketing": ["Digital Agencies", "Consumer Brands", "E-commerce"],
+        "Science": ["Research Labs", "Universities", "R&D Centers"],
+    }
+    return dedupe_list(base + category_industries.get(category, []) + domain_industries.get(domain, []))[:8]
 
 
 def build_country_insights(intelligence: CountryCareerIntelligence, category: str, market_profile: dict[str, Any]) -> list[str]:

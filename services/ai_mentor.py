@@ -10,6 +10,98 @@ from services.career_knowledge import (
 )
 
 
+MENTOR_PROFESSIONS = [
+    "Software Engineering",
+    "Artificial Intelligence",
+    "Machine Learning",
+    "Data Science",
+    "Cyber Security",
+    "Cloud Computing",
+    "DevOps",
+    "Civil Engineering",
+    "Mechanical Engineering",
+    "Electrical Engineering",
+    "Electronics Engineering",
+    "Architecture",
+    "Business",
+    "Management",
+    "Finance",
+    "Marketing",
+    "Sales",
+    "Human Resources",
+    "Hospitality",
+    "Hotel Management",
+    "Tourism",
+    "Journalism",
+    "Media",
+    "Law",
+    "Healthcare",
+    "Medicine",
+    "Nursing",
+    "Pharmacy",
+    "Pilot",
+    "Aviation",
+    "Graphic Design",
+    "UI/UX",
+    "Interior Design",
+    "Product Design",
+    "Fashion Design",
+    "Animation",
+    "Game Development",
+    "Teaching",
+    "Research",
+    "Government Jobs",
+    "UPSC",
+    "Entrepreneurship",
+    "Freelancing",
+    "Study Abroad",
+    "Higher Studies",
+]
+
+
+MENTOR_THEMES = [
+    "What should I learn next for {profession}?",
+    "How can I improve my resume for {profession}?",
+    "Which certifications matter most for {profession}?",
+    "What projects or portfolio proof should I build for {profession}?",
+    "How should I prepare for {profession} interviews?",
+    "How can I get an internship or first role in {profession}?",
+]
+
+
+GENERAL_MENTOR_QUESTIONS = [
+    "How can I improve my ATS score?",
+    "How can I negotiate salary professionally?",
+    "How should I improve my LinkedIn profile?",
+    "How can I build a stronger GitHub portfolio?",
+    "How do I prepare for remote jobs?",
+    "How can I improve communication skills?",
+    "How can I build leadership proof as a student?",
+    "How do I switch careers without starting from zero?",
+    "How should I choose between higher studies and a job?",
+    "How can I increase my Resume Match Score?",
+    "What should I do in the next 30 days?",
+    "How do I prioritize missing skills?",
+    "How do I explain career gaps?",
+    "How do I write better project bullet points?",
+    "How do I prepare for HR interviews?",
+    "How do I create a portfolio if my field is non-technical?",
+    "How do I target companies in another country?",
+    "How do I plan a weekly learning routine?",
+    "How do I prove impact in my resume?",
+    "How can I become industry ready faster?",
+]
+
+
+def get_mentor_question_library() -> list[str]:
+    questions = []
+    for profession in MENTOR_PROFESSIONS:
+        for template in MENTOR_THEMES:
+            questions.append(template.format(profession=profession))
+    questions.extend(GENERAL_MENTOR_QUESTIONS)
+    return questions[:320]
+
+
 def build_mentor_context(
     *,
     profile: Any,

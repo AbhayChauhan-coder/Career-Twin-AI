@@ -1318,6 +1318,7 @@ def enrich_career(name: str, career: dict[str, Any]) -> dict[str, Any]:
 
 def generate_profession_profile(name: str, domain: str) -> dict[str, Any]:
     """Create a profession-aware career profile from reusable domain data."""
+    domain = role_domain_override(name, domain)
     profile = DOMAIN_PROFILES.get(domain, DOMAIN_PROFILES["Business"])
     required = role_specific_skills(name, domain, profile)
     description = f"{name} is a {domain.lower()} profession focused on {', '.join(required[:3]).lower()} and measurable career outcomes."
@@ -1393,6 +1394,19 @@ def role_specific_skills(name: str, domain: str, profile: dict[str, Any]) -> lis
         if keyword in lowered:
             skills = values + skills
     return dedupe(skills)[:8]
+
+
+def role_domain_override(name: str, domain: str) -> str:
+    lowered = name.casefold()
+    if "physiotherapist" in lowered or "physiotherapy" in lowered:
+        return "Healthcare"
+    if any(term in lowered for term in ["audit", "accountant", "tax", "finance controller", "chartered accountant"]):
+        return "Finance"
+    if any(term in lowered for term in ["journalist", "reporter", "editor"]):
+        return "Creative"
+    if any(term in lowered for term in ["pilot", "aviation", "flight"]):
+        return "Engineering"
+    return domain
 
 
 def role_specific_technical_skills(name: str, domain: str, profile: dict[str, Any]) -> list[str]:
@@ -1839,9 +1853,16 @@ def recommend_careers_for_profile(
     goal_name = str(getattr(profile, "career_goal", "") or "")
     goal_domain = str(careers.get(goal_name, {}).get("domain", "")) if goal_name else ""
     primary_domain = current_domain if current_domain and current_domain != "General" else goal_domain
-    explicit_switch = bool(goal_domain and primary_domain and goal_domain != primary_domain)
     education = " ".join([getattr(profile, "degree", ""), getattr(profile, "branch", "")]).casefold()
     skills = [skill.casefold() for skill in getattr(profile, "skills", [])]
+    designation_domain = domain_from_designation(designation, skills)
+    if designation_domain:
+        primary_domain = designation_domain
+        current_domain = designation_domain
+        current_path = career_path_for(designation, current_domain)
+        if not goal_domain:
+            goal_domain = designation_domain
+    explicit_switch = bool(goal_domain and primary_domain and goal_domain != primary_domain)
     certifications = [cert.casefold() for cert in getattr(profile, "certifications", [])]
     detected_domain = getattr(resume, "detected_domain", "") if resume else ""
     scored = []
@@ -1850,6 +1871,8 @@ def recommend_careers_for_profile(
         degrees = " ".join(career.get("degree_requirements", [])).casefold()
         cert_targets = [cert.casefold() for cert in career.get("preferred_certifications", career.get("certifications", []))]
         career_domain = career.get("domain", "")
+        if "physiotherapist" in name.casefold():
+            career_domain = "Healthcare"
         if primary_domain and career_domain != primary_domain and not (explicit_switch and career_domain == goal_domain):
             continue
 
@@ -1897,6 +1920,7 @@ def recommend_careers_for_profile(
                 total += 18
             elif goal_key in name_key or name_key in goal_key:
                 total += 10
+            total += role_family_alignment_score(goal_key, name_key)
         if designation:
             designation_key = strip_seniority(designation).casefold()
             if designation_key and designation_key in name.casefold():
@@ -1967,6 +1991,42 @@ def infer_current_designation(profile: Any, resume: Any | None) -> str:
             if len(role) > 4 and role.casefold() in text.casefold():
                 return role
     return " ".join(getattr(profile, "internships", [])[:1] or getattr(profile, "projects", [])[:1])
+
+
+def domain_from_designation(designation: str, skills: list[str]) -> str:
+    signal = f"{designation} {' '.join(skills)}".casefold()
+    if any(term in signal for term in ["devops", "site reliability", "cloud engineer", "kubernetes", "terraform", "ci/cd"]):
+        return "Technology"
+    if any(term in signal for term in ["software", "developer", "backend", "frontend", "full stack", "data scientist", "machine learning", "ai engineer"]):
+        return "Technology"
+    if any(term in signal for term in ["audit", "accountant", "accounting", "taxation", "financial reporting", "chartered accountant", "finance analyst"]):
+        return "Finance"
+    if any(term in signal for term in ["pilot", "aviation", "flight operations"]):
+        return "Engineering"
+    if any(term in signal for term in ["physiotherapist", "rehabilitation", "patient assessment", "exercise therapy"]):
+        return "Healthcare"
+    if any(term in signal for term in ["journalist", "reporting", "editing", "media research", "storytelling"]):
+        return "Creative"
+    if any(term in signal for term in ["administrative officer", "public administration", "policy"]):
+        return "Government"
+    if any(term in signal for term in ["sales executive", "account executive", "business development"]):
+        return "Business"
+    return ""
+
+
+def role_family_alignment_score(goal_key: str, name_key: str) -> int:
+    families = [
+        (["pilot", "aviation", "flight"], ["pilot", "aviation", "flight", "airline"], -45),
+        (["journalist", "journalism", "media"], ["journalist", "journalism", "editor", "reporter", "media", "news"], -42),
+        (["physiotherapist", "physiotherapy"], ["physiotherapist", "physiotherapy", "rehabilitation", "clinical"], -38),
+        (["interior designer", "interior design"], ["interior", "designer", "space", "architecture"], -35),
+    ]
+    for goal_terms, allowed_terms, penalty in families:
+        if any(term in goal_key for term in goal_terms):
+            if any(term in name_key for term in allowed_terms):
+                return 26
+            return penalty
+    return 0
 
 
 def infer_years_experience(profile: Any, resume: Any | None) -> int:

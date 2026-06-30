@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from models.user import UserProfile
-from services.career_engine import load_careers
+from services.career_engine import calculate_readiness, calculate_success_probability, load_careers
 from services.career_knowledge import get_career_knowledge, recommend_careers_for_profile
-from services.country_intelligence import get_country_career_intelligence
+from services.country_intelligence import SUPPORTED_COUNTRIES, get_country_career_intelligence
 from services.resume_matcher import analyze_resume_match
 from services.resume_parser import parse_resume_text
 
@@ -102,7 +102,8 @@ def run_validation_suite() -> dict[str, object]:
     if duplicate_count:
         failures.append({"resume": "catalog", "reason": f"{duplicate_count} duplicate career titles found"})
 
-    for sample in samples:
+    for index, sample in enumerate(samples):
+        target_country = SUPPORTED_COUNTRIES[index % len(SUPPORTED_COUNTRIES)]
         resume = parse_resume_text(sample.text, careers)
         profile = UserProfile(
             name=sample.name,
@@ -116,12 +117,14 @@ def run_validation_suite() -> dict[str, object]:
             certifications=resume.certifications,
             internships=resume.experience,
             career_goal=resolve_validation_career_goal(sample, careers),
-            target_country="India",
+            target_country=target_country,
         )
         career_definition = get_career_knowledge(profile.career_goal, careers.get(profile.career_goal, {}))
         recommendations = recommend_careers_for_profile(profile, resume, careers, limit=5)
         country_intelligence = get_country_career_intelligence(profile.career_goal, profile.target_country, career_definition)
         resume_match = analyze_resume_match(resume, profile, career_definition)
+        readiness = calculate_readiness(profile, career_definition)
+        probability = calculate_success_probability(profile, readiness["score"], len(readiness["missing_skills"]))
 
         names = [item.career for item in recommendations]
         joined_names = " ".join(names).casefold()
@@ -151,8 +154,24 @@ def run_validation_suite() -> dict[str, object]:
             reasons.append("Career intelligence missing: " + ", ".join(intelligence_missing))
         if not country_intelligence.entry_salary or not country_intelligence.interview_process:
             reasons.append("Country intelligence missing salary or interview process")
+        if country_intelligence.country != target_country:
+            reasons.append(f"Country intelligence did not resolve selected country: {target_country}")
+        if not country_intelligence.currency or not country_intelligence.average_salary:
+            reasons.append("Country intelligence missing currency or average salary")
+        if not country_intelligence.major_hiring_industries or not country_intelligence.visa_overview:
+            reasons.append("Country intelligence missing industries or visa overview")
         if not (0 <= resume_match.overall_match <= 100):
             reasons.append("Resume match score outside 0-100")
+        if not (20 <= readiness["score"] <= 100):
+            reasons.append(f"Career readiness score unrealistic: {readiness['score']}")
+        if not (20 <= probability <= 100):
+            reasons.append(f"Success probability unrealistic: {probability}")
+        if readiness["score"] == probability and profile.project_count and profile.internship_count:
+            reasons.append("Independent scoring failed: readiness and success probability were identical for a complete profile")
+        if profile.skills and profile.project_count and readiness["score"] < 35:
+            reasons.append(f"Complete profile received unfairly low readiness: {readiness['score']}")
+        if not readiness.get("positive_factors") or not readiness.get("improvement_factors"):
+            reasons.append("Readiness explainability missing")
 
         passed = not reasons
         if not passed:
@@ -164,6 +183,8 @@ def run_validation_suite() -> dict[str, object]:
                 "recommendations": names,
                 "country_interview": country_intelligence.interview_process,
                 "resume_match": resume_match.overall_match,
+                "readiness": readiness["score"],
+                "success_probability": probability,
                 "passed": passed,
             }
         )
@@ -182,26 +203,89 @@ def run_validation_suite() -> dict[str, object]:
 def expanded_validation_resumes() -> list[ValidationResume]:
     expanded = list(VALIDATION_RESUMES)
     for sample in VALIDATION_RESUMES:
-        alternate_text = (
-            f"{sample.name}\n"
-            f"Professional Experience\n{sample.text}\n"
-            "Core Competencies\n"
-            "Communication Skills | Leadership | Problem Solving\n"
-            "Achievements\nDelivered measurable outcomes in the current profession\n"
-            "Languages\nEnglish\n"
-        )
-        expanded.append(
-            ValidationResume(
-                name=sample.name,
-                text=alternate_text,
-                expected_terms=sample.expected_terms,
-                allowed_domains=sample.allowed_domains,
+        variants = [
+            (
+                f"{sample.name}\n"
+                f"Professional Experience\n{sample.text}\n"
+                "Core Competencies\n"
+                "Communication Skills | Leadership | Problem Solving\n"
+                "Achievements\nDelivered measurable outcomes in the current profession\n"
+                "Languages\nEnglish\n"
+            ),
+            (
+                f"Name: {sample.name} Candidate\n"
+                f"Headline / Current Designation\n{sample.text.splitlines()[0]}\n"
+                "Profile Summary\n"
+                f"{sample.text}\n"
+                "Selected Projects\nProfession-specific portfolio project with measurable impact\n"
+                "Certifications\nRelevant professional certification\n"
+                "Education\nDegree aligned to current profession\n"
+            ),
+            (
+                f"{sample.name} Candidate\n"
+                "SUMMARY\n"
+                f"Experienced {sample.name.lower()} profile with role-specific achievements.\n"
+                "EXPERIENCE\n"
+                f"{sample.text}\n"
+                "PROJECTS\n"
+                "Built a profession-specific improvement initiative with measurable results.\n"
+            ),
+            (
+                "CURRICULUM VITAE\n"
+                f"Candidate: {sample.name}\n"
+                f"{sample.text}\n"
+                "KEY SKILLS\n"
+                "Communication, Documentation, Stakeholder Management\n"
+                "CERTIFICATIONS\n"
+                "Professional development certificate\n"
+            ),
+            (
+                f"{sample.name} Resume\n"
+                "Current Position\n"
+                f"{sample.text.splitlines()[0]}\n"
+                "Education and Training\n"
+                f"{sample.text}\n"
+                "Impact\n"
+                "Improved quality, efficiency, service, or delivery outcomes in the profession.\n"
+            ),
+            (
+                f"{sample.name}\n"
+                "Profile\n"
+                f"{sample.text}\n"
+                "Portfolio / Work Samples\n"
+                "Role-specific work sample with documented process and outcome.\n"
+                "Professional Strengths\n"
+                "Problem Solving | Collaboration | Communication\n"
+            ),
+            (
+                f"{sample.name} - Professional Bio\n"
+                f"{sample.text}\n"
+                "Responsibilities\n"
+                "Handled core responsibilities aligned with the stated designation.\n"
+                "Tools and Methods\n"
+                "Used profession-appropriate tools, standards, and documentation.\n"
+            ),
+        ]
+        for variant in variants:
+            expanded.append(
+                ValidationResume(
+                    name=sample.name,
+                    text=variant,
+                    expected_terms=sample.expected_terms,
+                    allowed_domains=sample.allowed_domains,
+                )
             )
-        )
     return expanded
 
 
 def resolve_validation_career_goal(sample: ValidationResume, careers: dict[str, dict[str, Any]]) -> str:
+    preferred = {
+        "Government Officer": "Administrative Officer",
+        "Pilot": "Commercial Pilot",
+        "Sales Executive": "Sales Executive",
+    }
+    if preferred.get(sample.name) in careers:
+        return preferred[sample.name]
     if sample.name in careers:
         return sample.name
     for term in sample.expected_terms:

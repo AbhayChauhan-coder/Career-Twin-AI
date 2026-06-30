@@ -29,6 +29,40 @@ def normalize_skill(skill: str) -> str:
     return skill.strip().casefold()
 
 
+SKILL_ALIASES = {
+    "js": "javascript",
+    "ts": "typescript",
+    "py": "python",
+    "ml": "machine learning",
+    "ai": "artificial intelligence",
+    "powerbi": "power bi",
+    "ms excel": "excel",
+    "advanced excel": "excel",
+    "postgres": "postgresql",
+    "node": "node.js",
+}
+
+
+def canonical_skill(skill: str) -> str:
+    normalized = normalize_skill(skill)
+    normalized = normalized.replace("+ +", "++").replace(" ", " ")
+    return SKILL_ALIASES.get(normalized, normalized)
+
+
+def score_label(score: int) -> str:
+    if score >= 90:
+        return "Exceptional"
+    if score >= 78:
+        return "Advanced"
+    if score >= 65:
+        return "Industry Ready"
+    if score >= 48:
+        return "Developing"
+    if score >= 30:
+        return "Foundation"
+    return "Beginner"
+
+
 def split_multiline_or_csv(value: str) -> list[str]:
     if not value:
         return []
@@ -38,46 +72,104 @@ def split_multiline_or_csv(value: str) -> list[str]:
 
 def calculate_readiness(profile: UserProfile, career: dict[str, Any]) -> dict[str, Any]:
     required = career.get("required_skills", [])
-    user_skills = {normalize_skill(skill) for skill in profile.skills}
-    matched = [skill for skill in required if normalize_skill(skill) in user_skills]
-    missing = [skill for skill in required if normalize_skill(skill) not in user_skills]
+    user_skills = {canonical_skill(skill) for skill in profile.skills}
+    matched = [skill for skill in required if canonical_skill(skill) in user_skills]
+    missing = [skill for skill in required if canonical_skill(skill) not in user_skills]
 
-    skill_score = (len(matched) / len(required)) * 70 if required else 0
-    project_score = min(profile.project_count, 3) / 3 * 10
-    internship_score = min(profile.internship_count, 2) / 2 * 10
-    certification_score = min(profile.certification_count, 2) / 2 * 5
-    study_score = min(profile.weekly_study_hours, 20) / 20 * 5
+    skill_coverage = len(matched) / len(required) if required else min(len(user_skills) / 8, 1)
+    skill_score = skill_coverage * 42
+    education_score = 10 if profile.degree else 4
+    project_score = min(profile.project_count, 4) / 4 * 14
+    experience_score = min(profile.internship_count, 3) / 3 * 12
+    certification_score = min(profile.certification_count, 3) / 3 * 8
+    achievement_score = min(len([item for item in profile.achievements if item.strip()]), 3) / 3 * 5
+    language_score = min(len([item for item in profile.languages if item.strip()]), 2) / 2 * 3
+    study_score = min(profile.weekly_study_hours, 18) / 18 * 6
 
-    score = round(skill_score + project_score + internship_score + certification_score + study_score)
+    score = round(
+        skill_score
+        + education_score
+        + project_score
+        + experience_score
+        + certification_score
+        + achievement_score
+        + language_score
+        + study_score
+    )
+    if profile.skills or profile.degree or profile.projects or profile.internships:
+        score = max(score, 32)
+    if profile.skills and (profile.projects or profile.internships):
+        score = max(score, 44)
+
+    positives = []
+    improvements = []
+    if matched:
+        positives.append(f"{len(matched)} target skill(s) already match the role")
+    if profile.degree:
+        positives.append("education information is present")
+    if profile.project_count:
+        positives.append(f"{profile.project_count} project signal(s) support the profile")
+    else:
+        improvements.append("add one practical project or case study for this role")
+    if profile.internship_count:
+        positives.append("experience, internship, or professional exposure is included")
+    else:
+        improvements.append("add internship, job, freelance, lab, or volunteer experience")
+    if profile.certification_count:
+        positives.append("certifications provide proof of learning")
+    if profile.weekly_study_hours >= 8:
+        positives.append("weekly study consistency is strong")
+    elif profile.weekly_study_hours:
+        improvements.append("increase weekly practice consistency")
+    if missing:
+        improvements.append("close priority skill gaps: " + ", ".join(missing[:4]))
+
+    final_score = max(0, min(score, 100))
     return {
-        "score": max(0, min(score, 100)),
+        "score": final_score,
+        "label": score_label(final_score),
         "matched_skills": matched,
         "missing_skills": missing,
         "required_skills": required,
+        "skill_coverage": round(skill_coverage * 100),
+        "recommended_next_skills": missing[:5],
+        "positive_factors": positives or ["profile foundation is ready for improvement"],
+        "improvement_factors": improvements or ["keep adding measurable proof of work"],
+        "why": "Career readiness measures current profile quality: education, skills, projects, experience, certifications, achievements, languages, and study consistency.",
     }
 
 
 def calculate_success_probability(profile: UserProfile, readiness_score: int, missing_count: int) -> int:
-    probability = readiness_score
+    del readiness_score
+    probability = 34
 
-    if profile.weekly_study_hours >= 12:
+    if profile.career_goal:
+        probability += 7
+    if profile.degree:
+        probability += 6
+    probability += min(len(profile.skills), 10) * 1.4
+    probability += min(profile.project_count, 4) * 4
+    probability += min(profile.internship_count, 3) * 5
+    probability += min(profile.certification_count, 3) * 3
+    probability += min(len([item for item in profile.achievements if item.strip()]), 3) * 2
+
+    if profile.weekly_study_hours >= 14:
+        probability += 12
+    elif profile.weekly_study_hours >= 8:
         probability += 8
-    elif profile.weekly_study_hours < 5:
-        probability -= 8
+    elif profile.weekly_study_hours >= 3:
+        probability += 4
 
     if profile.gpa >= 8:
-        probability += 5
-    elif profile.gpa < 6:
-        probability -= 5
+        probability += 4
+    elif 6 <= profile.gpa < 8:
+        probability += 2
 
-    if profile.project_count >= 2:
-        probability += 6
-    if profile.internship_count >= 1:
-        probability += 6
-    if missing_count >= 5:
-        probability -= 8
+    probability -= min(missing_count, 6) * 1.5
+    if profile.skills or profile.projects or profile.internships:
+        probability = max(probability, 38)
 
-    return max(5, min(round(probability), 98))
+    return max(20, min(round(probability), 96))
 
 
 def career_matches(profile: UserProfile, careers: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -96,6 +188,8 @@ def career_matches(profile: UserProfile, careers: dict[str, dict[str, Any]]) -> 
                 "probability": probability,
                 "missing_skills": readiness["missing_skills"],
                 "matched_skills": readiness["matched_skills"],
+                "label": readiness["label"],
+                "reasoning": readiness.get("positive_factors", [])[:3],
             }
         )
     return sorted(matches, key=lambda item: (item["probability"], item["score"]), reverse=True)

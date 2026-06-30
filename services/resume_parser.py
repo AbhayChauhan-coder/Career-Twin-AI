@@ -435,7 +435,7 @@ def detect_current_designation(
         "title",
     ]
     role_names = sorted(careers.keys(), key=lambda value: (-len(value), value.casefold()))
-    for line in lines[:60]:
+    for index, line in enumerate(lines[:60]):
         lower = line.casefold()
         for label in labels:
             if label in lower:
@@ -444,10 +444,19 @@ def detect_current_designation(
                 matched = match_known_role(candidate_text, role_names)
                 if matched:
                     return matched, 0.92
+                if len(tail) == 1 and index + 1 < len(lines):
+                    next_line = lines[index + 1]
+                    next_match = match_known_role(next_line, role_names)
+                    if next_match:
+                        return next_match, 0.9
+                    cleaned_next = clean_designation_candidate(next_line)
+                    if cleaned_next:
+                        return cleaned_next, 0.78
                 cleaned = re.sub(r"(?i)\b(current role|current designation|designation|job title|position|role|title)\b", "", candidate_text)
                 cleaned = cleaned.strip(" :-–—|")
-                if 3 <= len(cleaned) <= 80:
-                    return cleaned, 0.72
+                cleaned_candidate = clean_designation_candidate(cleaned)
+                if cleaned_candidate:
+                    return cleaned_candidate, 0.72
 
     for line in lines[:80]:
         matched = match_known_role(line, role_names)
@@ -457,6 +466,23 @@ def detect_current_designation(
     if matched:
         return matched, 0.68
     return "", 0.0
+
+
+def clean_designation_candidate(value: str) -> str:
+    cleaned = re.sub(
+        r"(?i)\b(headline|summary|profile|current designation|current role|designation|job title|position|role|title)\b",
+        "",
+        value,
+    )
+    cleaned = re.sub(r"^[\s:\-|/]+|[\s:\-|/]+$", "", cleaned)
+    if not (3 <= len(cleaned) <= 80):
+        return ""
+    role_markers = r"\b(engineer|manager|officer|analyst|developer|designer|professor|doctor|nurse|pilot|lawyer|executive|associate|scientist|teacher)\b"
+    if "/" in value and not re.search(role_markers, cleaned, flags=re.IGNORECASE):
+        return ""
+    if cleaned.casefold() in {"current", "designation", "headline", "profile", "summary"}:
+        return ""
+    return cleaned
 
 
 def match_known_role(text: str, role_names: list[str]) -> str:
