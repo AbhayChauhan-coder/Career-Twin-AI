@@ -4,12 +4,21 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import math
 import os
+from dotenv import load_dotenv
 from typing import Any
 
 import requests
 
 from services.scoring import calibrated_score
 
+load_dotenv()
+print("GITHUB_TOKEN =", os.getenv("GITHUB_TOKEN"))
+print("GitHub Token Exists:", bool(os.getenv("GITHUB_TOKEN")))
+
+print(
+    "GitHub Token Prefix:",
+    os.getenv("GITHUB_TOKEN")[:20] if os.getenv("GITHUB_TOKEN") else "NOT FOUND",
+)
 
 AI_KEYWORDS = {
     "ai",
@@ -235,12 +244,18 @@ def analyze_github_profile(username: str) -> GitHubAnalysis:
 
 def fetch_github_user(username: str) -> dict[str, Any]:
     url = f"https://api.github.com/users/{username}"
+    headers = {
+           "Accept": "application/vnd.github+json",
+           "User-Agent": "Career-Twin-AI",
+       }
+
+    github_token = os.getenv("GITHUB_TOKEN")
+    if github_token:
+           headers["Authorization"] = f"Bearer {github_token}"
+
     response = requests.get(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "Career-Twin-AI",
-        },
+         url,
+         headers=headers,
         timeout=15,
     )
     if response.status_code == 404:
@@ -254,15 +269,26 @@ def fetch_github_user(username: str) -> dict[str, Any]:
 
 def fetch_public_repos(username: str) -> list[dict[str, Any]]:
     url = f"https://api.github.com/users/{username}/repos"
+
+    headers = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "Career-Twin-AI",
+    }
+
+    github_token = os.getenv("GITHUB_TOKEN")
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+
     response = requests.get(
-        url,
-        params={"per_page": 100, "sort": "updated", "type": "owner"},
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "Career-Twin-AI",
+         url,
+        params={
+        "per_page": 100,
+        "sort": "updated",
+        "type": "owner",
         },
+         headers=headers,
         timeout=15,
-    )
+)
     if response.status_code == 404:
         raise RuntimeError("GitHub user not found.")
     if response.status_code == 403:

@@ -805,6 +805,23 @@ def render_github_analysis(analysis: GitHubAnalysis) -> None:
     with metric_cols[3]:
         render_metric("Portfolio Strength", analysis.portfolio_strength, f"Activity level: {analysis.activity_level}")
 
+    breakdown = getattr(analysis, "score_breakdown", {}) or {}
+    if breakdown:
+        st.markdown("**Recruiter-Grade Score Breakdown**")
+        breakdown_items = list(breakdown.values())
+        for start in range(0, len(breakdown_items), 4):
+            columns = st.columns(min(4, len(breakdown_items[start : start + 4])))
+            for column, item in zip(columns, breakdown_items[start : start + 4]):
+                with column:
+                    score = int(item.get("score", 0))
+                    render_metric(
+                        str(item.get("label", "Score")),
+                        f"{score}%",
+                        f"Weight {item.get('weight', 0)}%",
+                    )
+                    st.progress(score / 100)
+                    st.caption(str(item.get("reason", "")))
+
     section_anchor("github-stats")
     stats_cols = st.columns(4)
     with stats_cols[0]:
@@ -1074,6 +1091,15 @@ def render_project_summary_cards(repos: list[object]) -> None:
                 st.caption(f"Size: {getattr(repo, 'size_kb', 0):,} KB")
             if getattr(repo, "topics", []):
                 render_pills(repo.topics[:8])
+            breakdown = getattr(repo, "quality_breakdown", {}) or {}
+            if breakdown:
+                with st.expander("Quality score breakdown"):
+                    for item in breakdown.values():
+                        st.write(
+                            f"- {item.get('label', 'Signal')}: "
+                            f"{item.get('score', 0)}/{item.get('max', 0)}"
+                        )
+                        st.caption(str(item.get("reason", "")))
             if repo.url:
                 st.link_button("Open repository", repo.url)
 
