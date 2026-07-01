@@ -2211,7 +2211,7 @@ def main() -> None:
 
     st.title("Career Twin AI")
     st.caption(
-        "See the future version of your career before you live it. Build a digital career twin, compare your current skills with your destination, and get the route forward."
+        "See the future version of your career before you live it. Build a digital career twin..."
     )
     render_progress_steps(4 if profile else 1)
 
