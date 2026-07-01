@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import math
+import os
 from typing import Any
 
 import requests
@@ -411,17 +412,17 @@ def repo_quality_score(repo: GitHubRepoSummary) -> int:
         score += min(12, 5 + len(repo.description) // 22)
     if repo.topics:
         score += min(len(repo.topics), 6) * 2
-    score += min(20, round(math.log10(repo.stars + 1) * 7))
-    score += min(10, round(math.log10(repo.forks + 1) * 4))
-    score += min(4, round(math.log10(repo.watchers + 1) * 2))
+    score += min(14, round(math.log10(repo.stars + 1) * 7))
+    score += min(6, round(math.log10(repo.forks + 1) * 4))
+    score += min(2, round(math.log10(repo.watchers + 1) * 2))
     score += max(0, 9 - min(repo.open_issues, 40) // 5)
-    score += min(8, round(math.log10(repo.size_kb + 1) * 2)) if repo.size_kb else 0
-    score += 7 if repo.has_readme_signal else 0
-    score += 4 if repo.has_license else 0
-    score += 3 if repo.has_releases_signal else 0
+    score += min(6, round(math.log10(repo.size_kb + 1) * 2)) if repo.size_kb else 0
+    score += 4 if repo.has_readme_signal else 0
+    score += 3 if repo.has_license else 0
+    score += 2 if repo.has_releases_signal else 0
     score += min(14, LANGUAGE_COMPLEXITY.get(repo.language, 8))
     if repo.project_type != "General":
-        score += 5
+        score += 3
     if repo.updated_at:
         age = days_since(repo.updated_at)
         if age <= 30:
