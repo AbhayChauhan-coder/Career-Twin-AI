@@ -3,7 +3,7 @@
 Career Twin AI is an AI-powered career intelligence platform that analyzes resumes, GitHub profiles, and career goals to generate personalized career recommendations, learning roadmaps, skill-gap analysis, and country-specific career insights.
 
 The platform combines resume parsing, portfolio analysis, and large language models to provide users with actionable career guidance based on their current profile.
-
+(It's been deployed and it's working successfully please refer this link: https://career-twin-ai-cofjv57nxptltvtsrhsbua.streamlit.app/)
 ---
 
 ## Features
